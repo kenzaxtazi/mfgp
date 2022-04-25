@@ -5,6 +5,7 @@ from emukit.model_wrappers.gpy_model_wrappers import GPyMultiOutputWrapper
 from emukit.multi_fidelity.models import GPyLinearMultiFidelityModel
 from emukit.multi_fidelity.models.non_linear_multi_fidelity_model import make_non_linear_kernels, NonLinearMultiFidelityModel
 
+
 def linear_mfdgp(X_train, Y_train, dims=1, fidelities=2):
     """ Create a linear MFDGP model """
     base_kernels = [GPy.kern.RBF(dims), GPy.kern.RBF(dims)]
