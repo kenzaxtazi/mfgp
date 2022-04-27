@@ -59,8 +59,8 @@ X_train, Y_train = convert_xy_lists_to_arrays([lf_x_train, hf_x_train,], [lf_y_t
 
 
 ####### Models
-lm = linear_mfdgp(X_train, Y_train, dims=3)
-lm.optimize()
+#lm = linear_mfdgp(X_train, Y_train, dims=3)
+#lm.optimize()
 nlm = nonlinear_mfdgp(X_train, Y_train, dims=3)
 nlm.optimize()
 
@@ -70,32 +70,33 @@ n = x_val.shape[0]
 
 # Predictions for validation space
 x_met = convert_x_list_to_array([x_val, x_val])
+'''
 lm_l_y_pred, lm_l_std_pred = sp.special.inv_boxcox(lm.predict(x_met[:n]), lf_lambda)
 lm_h_y_pred, lm_h_std_pred = sp.special.inv_boxcox(lm.predict(x_met[n:]), hf_lambda)
+'''
 
 # Predictions for validation space
-x_met = convert_x_list_to_array([x_val, x_val])
 nlm_l_y_pred, nlm_l_std_pred = sp.special.inv_boxcox(nlm.predict(x_met[:n]), lf_lambda)
 nlm_h_y_pred, nlm_h_std_pred = sp.special.inv_boxcox(nlm.predict(x_met[n:]), hf_lambda)
 
 
 # R2
-lm_h_r2 = r2_score(y_val, lm_h_y_pred)
-lm_l_r2 = r2_score(y_val, lm_l_y_pred)
+#lm_h_r2 = r2_score(y_val, lm_h_y_pred)
+#lm_l_r2 = r2_score(y_val, lm_l_y_pred)
 nlm_h_r2 = r2_score(y_val, nlm_h_y_pred)
-nlm_l_r2 = r2_score(y_val, nlm_h_y_pred)
-print('Linear MFDGP high R2 = ', lm_h_r2)
-print('Linear MFDGP low R2 = ', lm_l_r2)
+nlm_l_r2 = r2_score(y_val, nlm_l_y_pred)
+#print('Linear MFDGP high R2 = ', lm_h_r2)
+#print('Linear MFDGP low R2 = ', lm_l_r2)
 print('Nonlinear MFDGP high R2 = ', nlm_h_r2)
 print('Nonlinear MFDGP low R2 = ', nlm_l_r2)
 
-
+'''
 # RMSE
 lm_h_rmse = mean_squared_error(y_val, lm_h_y_pred, squared=False)
 lm_l_rmse = mean_squared_error(y_val, lm_l_y_pred, squared=False)
 print('Linear MFDGP high RMSE = ', lm_h_rmse)
 print('Linear MFDGP low RMSE = ', lm_l_rmse)
-
+'''
 # RMSE
 nlm_h_rmse = mean_squared_error(y_val, nlm_h_y_pred, squared=False)
 nlm_l_rmse = mean_squared_error(y_val, nlm_l_y_pred, squared=False)
