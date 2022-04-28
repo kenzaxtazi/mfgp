@@ -1,2 +1,5 @@
 *.ipynb
-value_singleloc_test.py
+*.e
+*.o
+*-checkpoint.py
+__pycache__/models.cpython-37.pyc
