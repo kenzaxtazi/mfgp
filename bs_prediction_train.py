@@ -12,11 +12,12 @@ from emukit.multi_fidelity.convert_lists_to_array import convert_x_list_to_array
 
 # custom modules
 import models as m
+from pwd import pwd
 
 # Import data
-lf_df = pd.read_csv('/data/hpcdata/users/kenzi22/data/lf_beasut_data.csv')
-hf_df = pd.read_csv('/data/hpcdata/users/kenzi22/data/hf_beasut_data.csv')
-plot_df = pd.read_csv('/data/hpcdata/users/kenzi22/data/plot_beasut_data.csv')
+lf_df = pd.read_csv(pwd + 'data/lf_beasut_data.csv')
+hf_df = pd.read_csv(pwd + 'data/hf_beasut_data.csv')
+plot_df = pd.read_csv(pwd + 'data/plot_beasut_data.csv')
 
 # Transformations    
 hf_df['tp_tr'], hf_lambda = sp.stats.boxcox(hf_df['tp'].values + 0.01)
@@ -47,8 +48,8 @@ y_predh, std_predh = sp.special.inv_boxcox(model.predict(X_plot[n:]), hf_lambda)
 y_predl, std_predl = sp.special.inv_boxcox(model.predict(X_plot[:n]), lf_lambda)
 
 # save predictions
-np.savetxt("data/y_predh.csv", y_predh, delimiter=",")
-np.savetxt("data/y_predl.csv", y_predl, delimiter=",")
-np.savetxt("data/std_predh.csv", std_predh, delimiter=",")
-np.savetxt("data/std_predl.csv", std_predl, delimiter=",")
+np.savetxt(pwd + "data/y_predh.csv", y_predh, delimiter=",")
+np.savetxt(pwd + "data/y_predl.csv", y_predl, delimiter=",")
+np.savetxt(pwd + "data/std_predh.csv", std_predh, delimiter=",")
+np.savetxt(pwd + "data/std_predl.csv", std_predl, delimiter=",")
 

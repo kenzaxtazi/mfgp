@@ -10,6 +10,7 @@ import pandas as pd
 
 # custom modules
 from load import beas_sutlej_gauges, era5
+from pwd import pwd
 
 
 ########### Data
@@ -70,11 +71,11 @@ lf_train_df = lf_train_df.drop(['expver', 'd2m', 'anor', 'slor', 'tcwv', 'N34'],
 
 
 ### Plot data
-srtm_ds = xr.open_dataset('~/data/SRTM_data.nc')
+srtm_ds = xr.open_dataset(pwd +'/data/SRTM_data.nc')
 srtm_ds = srtm_ds.rename({'nlat': 'lat', 'nlon': 'lon', 'elevation': 'z'})
 
 # Mask to beas and sutlej
-mask_filepath = '~/data/Masks/Beas_Sutlej_highres_mask.nc'
+mask_filepath = pwd + 'data/Masks/Beas_Sutlej_highres_mask.nc'
 mask = xr.open_dataset(mask_filepath)
 mask_da = mask.Overlap
 msk_srtm_ds = srtm_ds.where(mask_da > 0, drop=True)
