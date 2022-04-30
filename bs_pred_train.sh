@@ -2,7 +2,8 @@
 #SBATCH --account=gpu
 #SBATCH --partition=gpu
 #SBATCH --job-name=bs_prediction_train
-#SBATCH -o /data/hpcdata/users/kenzi22/mfdgp/slurm_job_output/%j
+#SBATCH -o bs_prediction_train-%j.o
+#SBATCH -e bs_prediction_train-%j.e
 #SBATCH --nodelist=node022
 #SBATCH --mem=100gb
 #SBATCH --gres=gpu:2
