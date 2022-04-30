@@ -8,7 +8,7 @@ from emukit.multi_fidelity.models.non_linear_multi_fidelity_model import make_no
 
 def linear_mfdgp(X_train, Y_train, fidelities=2):
     """ Create a linear MFDGP model """
-    dims = X_train.shape[1]
+    dims = X_train.shape[1] - 1
     base_kernels = [GPy.kern.RBF(dims), GPy.kern.RBF(dims)]
     kernel = emukit.multi_fidelity.kernels.LinearMultiFidelityKernel(base_kernels)
     unwrp_model = GPyLinearMultiFidelityModel(X_train, Y_train, kernel, n_fidelities= fidelities)
@@ -20,9 +20,9 @@ def linear_mfdgp(X_train, Y_train, fidelities=2):
 
 def nonlinear_mfdgp(X_train, Y_train, fidelities=2):
     """ Create a nonlinear MFDGP model """
-    dims = X_train.shape[1]
+    dims = X_train.shape[1] - 1
     base_kernel = GPy.kern.RBF
-    kernels = make_non_linear_kernels(base_kernel, fidelities, dims - 1)
+    kernels = make_non_linear_kernels(base_kernel, fidelities, dims)
     model = NonLinearMultiFidelityModel(X_train, Y_train, n_fidelities=fidelities, kernels=kernels, verbose=True, optimization_restarts=5)
     m1, m2 = model.models
     m1.Gaussian_noise.variance.fix(0)
@@ -31,4 +31,3 @@ def nonlinear_mfdgp(X_train, Y_train, fidelities=2):
 
 def save(model, name):
     """TO DO"""
-    
