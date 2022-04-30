@@ -14,9 +14,9 @@ from emukit.multi_fidelity.convert_lists_to_array import convert_x_list_to_array
 import models as m
 
 # Import data
-lf_df = pd.read_csv('data/lf_beasut_data.csv')
-hf_df = pd.read_csv('data/hf_beasut_data.csv')
-plot_df = pd.read_csv('data/plot_beasut_data.csv')
+lf_df = pd.read_csv('/data/hpcdata/users/kenzi22/data/lf_beasut_data.csv')
+hf_df = pd.read_csv('/data/hpcdata/users/kenzi22/data/hf_beasut_data.csv')
+plot_df = pd.read_csv('/data/hpcdata/users/kenzi22/data/plot_beasut_data.csv')
 
 # Transformations    
 hf_df['tp_tr'], hf_lambda = sp.stats.boxcox(hf_df['tp'].values + 0.01)
