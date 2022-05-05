@@ -10,7 +10,6 @@ import pandas as pd
 
 # custom modules
 from load import beas_sutlej_gauges, era5
-from pwd import pwd
 
 
 ########### Data
@@ -39,7 +38,7 @@ station_dict = {'Arki':[31.154, 76.964, 1176], 'Banjar': [31.65, 77.34, 1914], '
                 'Suni':[31.238,77.108, 655], 'Suni IMD':[31.23, 77.164, 765], 'Swaghat': [31.713, 76.746, 991], 
                 'Theog': [31.124, 77.347, 2101]}
 
-station_df = pd.DataFrame.from_dict(station_dict, orient='index',columns=['lat', 'lon', 'elv'])
+station_df = pd.DataFrame.from_dict(station_dict, orient='index', columns=['lat', 'lon', 'elv'])
 station_df = station_df.reset_index()
 
 # Define training set
@@ -48,12 +47,13 @@ hf_train_df2 = station_df[(station_df['lon']< 76.60) & ((station_df['lat']< 32) 
 hf_train_df3 = station_df[(station_df['lon']> 77.0) & (station_df['lat']< 31)]
 hf_train_df4 = station_df[(station_df['lon']< 78.0) & (station_df['lon']> 77.0) & (station_df['lat']> 31) & (station_df['lat']< 31.23)]
 hf_train_df5 = station_df[(station_df['lon']> 78.2)]
-hf_train_stations = list(hf_train_df5['index'].values) + list(hf_train_df2['index'].values) + list(hf_train_df3['index'].values) + list(hf_train_df4['index'].values) + list(hf_train_df5['index'].values)
+# hf_train_stations = list(hf_train_df1['index'].values)# + list(hf_train_df2['index'].values) + list(hf_train_df3['index'].values) + list(hf_train_df4['index'].values) + list(hf_train_df5['index'].values)
+station_list =  ['Banjar', 'Bhakra', 'Larji', 'Kasol', 'Sainj', 'Suni', 'Pandoh', 'Janjehl', 'Bhuntar', 'Rampur']
 
 # Format training data
 hf_train_list = []
-for station in hf_train_stations:
-    station_ds = beas_sutlej_gauges.gauge_download(station, minyear=1980, maxyear=2000)
+for station in station_list:
+    station_ds = beas_sutlej_gauges.gauge_download(station, minyear=1998, maxyear=2004)
     station_ds['z'] = station_dict[station][2]
     #station_ds['slope'] = srtm.find_slope(station).slope.values
     station_ds = station_ds.set_coords('z')
@@ -63,19 +63,12 @@ for station in hf_train_stations:
 hf_train_ds = xr.merge(hf_train_list)
 hf_train_df = hf_train_ds.to_dataframe().dropna().reset_index()
 
-
-### LF data
-era5_ds =  era5.collect_ERA5('beas_sutlej', minyear=1980, maxyear=2000)
-lf_train_df = era5_ds.to_dataframe().dropna().reset_index()
-lf_train_df = lf_train_df.drop(['expver', 'd2m', 'anor', 'slor', 'tcwv', 'N34'], axis=1)
-
-
 ### Plot data
-srtm_ds = xr.open_dataset(pwd +'/data/SRTM_data.nc')
+srtm_ds = xr.open_dataset('~/data/SRTM_data.nc')
 srtm_ds = srtm_ds.rename({'nlat': 'lat', 'nlon': 'lon', 'elevation': 'z'})
 
 # Mask to beas and sutlej
-mask_filepath = pwd + 'data/Masks/Beas_Sutlej_highres_mask.nc'
+mask_filepath = '~/data/Masks/Beas_Sutlej_highres_mask.nc'
 mask = xr.open_dataset(mask_filepath)
 mask_da = mask.Overlap
 msk_srtm_ds = srtm_ds.where(mask_da > 0, drop=True)
@@ -83,12 +76,29 @@ msk_srtm_ds = srtm_ds.where(mask_da > 0, drop=True)
 msk_srtm_df = msk_srtm_ds.to_dataframe().dropna().reset_index()
 plot_df = msk_srtm_df.drop(['slope', 'aspect', 'latitude', 'longitude'], axis=1)
 
+plot_df1 = plot_df[plot_df['lat']<= 32]
+plot_df2 = plot_df1[plot_df1['lat']>= 31]
+plot_df3 = plot_df2[plot_df2['lon']>= 77]
+plot_df4 = plot_df3[plot_df3['lon']<= 78]
+
 # add to date predict at
-n = msk_srtm_df.shape[0]
-t = np.ones(n) * (1996 + (1./24.) * 3)
+n = plot_df.shape[0]
+t = np.ones(n) * (1998 + (1./24.) * 23)
 plot_df['time'] = t
 
+### LF data
+era5_ds =  era5.collect_ERA5('beas_sutlej', minyear=1998, maxyear=2004)
+#era5_ds1 = era5_ds.interp_like(msk_srtm_ds, 'nearest')
+
+lf_train_df = era5_ds.to_dataframe().dropna().reset_index()
+lf_train_df = lf_train_df.drop(['expver', 'd2m', 'anor', 'slor', 'tcwv', 'N34'], axis=1)
+
+lf_train_df1 = lf_train_df[lf_train_df['lat']<= 32]
+lf_train_df2 = lf_train_df1[lf_train_df1['lat']>= 31]
+lf_train_df3 = lf_train_df2[lf_train_df2['lon']>= 77]
+lf_train_df4 = lf_train_df3[lf_train_df3['lon']<= 78]
+
 # Save to csv
-lf_train_df.to_csv('~/data/lf_beasut_data.csv')
-hf_train_df.to_csv('~/data/hf_beasut_data.csv')
-plot_df.to_csv('~/data/plot_beasut_data.csv')
+lf_train_df.to_csv('~/data/lf_beasut_data3.csv')
+hf_train_df.to_csv('~/data/hf_beasut_data3.csv')
+plot_df.to_csv('~/data/plot_beasut_data3.csv')
