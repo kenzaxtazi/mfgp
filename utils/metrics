@@ -1,0 +1,37 @@
+import scipy as sp
+import numpy as np
+from sklearn.metrics import r2_score, mean_squared_error
+
+
+def r2(y_pred0, y_val, hf_lambda0, hf_lambda):
+    y_pred = sp.special.inv_boxcox(np.array(y_pred0), hf_lambda0).reshape(-1)
+    y_true = sp.special.inv_boxcox(y_val, hf_lambda).reshape(-1)
+    r2 = r2_score(y_true, y_pred)
+    print(r2)
+    return r2
+
+
+def rmse(y_pred0, y_val, xval, hf_lambda0, hf_lambda):
+    y_pred = sp.special.inv_boxcox(
+        np.array(y_pred0), hf_lambda0).reshape(-1)
+    y_true = sp.special.inv_boxcox(y_val, hf_lambda).reshape(-1)
+    rmse_all = mean_squared_error(y_true, y_pred, squared=False)
+    print('All = ', rmse_all)
+
+    # 5th PERCENTILE
+    p5 = np.percentile(y_true, 5.0)
+    indx = [y_true <= p5][0]
+    y_true_p5 = y_true[indx]
+    y_pred_p5 = y_pred[indx]
+    rmse_p5 = mean_squared_error(y_true_p5, y_pred_p5, squared=False)
+    print('5th percentile = ', rmse_p5)
+
+    # 95th PERCENTILE
+    p95 = np.percentile(y_true, 95.0)
+    indx = [y_true >= p95][0]
+    y_true_p95 = y_true[indx]
+    y_pred_p95 = y_pred[indx]
+    rmse_p95 = mean_squared_error(y_true_p95, y_pred_p95, squared=False)
+    print('95th percentile = ', rmse_p95)
+
+    return rmse_all, rmse_p5, rmse_p95
