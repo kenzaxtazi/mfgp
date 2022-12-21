@@ -1,17 +1,16 @@
+from utils.metrics import rmses
+from sklearn.metrics import r2_score
+import scipy as sp
+import numpy as np
+import pandas as pd
+import torch
+import gpytorch
+from matplotlib import pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from load import beas_sutlej_gauges, era5
 import sys
 sys.path.append('/data/hpcdata/users/kenzi22/')
 sys.path.append('/data/hpcdata/users/kenzi22/mfdgp/')
-
-from load import beas_sutlej_gauges, era5
-from sklearn.preprocessing import MinMaxScaler
-from matplotlib import pyplot as plt
-import gpytorch
-import torch
-import pandas as pd
-import numpy as np
-import scipy as sp
-from sklearn.metrics import r2_score
-from utils.metrics import rmses
 
 
 class LF_gp(gpytorch.models.ExactGP):
@@ -23,8 +22,9 @@ class LF_gp(gpytorch.models.ExactGP):
         dim = train_x.shape[1]
         self.mean_module = gpytorch.means.ConstantMean()
         base_kernel = gpytorch.kernels.MaternKernel(nu=2.5,
-            ard_num_dims=dim, active_dims=np.arange(dim))
-        self.covar_module = gpytorch.kernels.GridInterpolationKernel(base_kernel, grid_size=grid_size, num_dims=dim)
+                                                    ard_num_dims=dim, active_dims=np.arange(dim))
+        # gpytorch.kernels.GridInterpolationKernel(grid_size=grid_size, num_dims=dim)
+        self.covar_module = base_kernel
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -56,7 +56,8 @@ class HF_lin_gp(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, base_kernel):
         super(HF_lin_gp, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=2.5, active_dims=[4])) + base_kernel
+        self.covar_module = gpytorch.kernels.ScaleKernel(
+            gpytorch.kernels.MaternKernel(nu=2.5, active_dims=[4])) + base_kernel
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -126,7 +127,7 @@ def evaluate_first_lvl(m1, likelihood1, train_x_hf):
         trained_pred_dist1 = likelihood1(m1(train_x_hf))
         mu1 = trained_pred_dist1.mean
         v1 = trained_pred_dist1.variance
-    
+
     return mu1, v1
 
 
@@ -184,11 +185,14 @@ def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, val_x, nsamples=1000):
 
     # Predict at validation points
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        
+
         val_arr = np.array(val_x.cpu())
         ntest = val_arr.shape[0]
-        
-        trained_pred_dist0 = likelihood1(m1(val_x.cuda()))
+
+        if torch.cuda.is_available():
+            val_x = val_x.cuda()
+
+        trained_pred_dist0 = likelihood1(m1(val_x))
         mu0 = trained_pred_dist0.mean.cpu()
         v0 = trained_pred_dist0.variance.cpu()
         C0 = trained_pred_dist0.covariance_matrix.cpu()
@@ -200,7 +204,10 @@ def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, val_x, nsamples=1000):
         # Push samples through f_2
         for i in range(0, nsamples):
             XXX = torch.Tensor(
-                np.hstack([val_arr, np.array(Z)[i, :][:, None]])).cuda()
+                np.hstack([val_arr, np.array(Z)[i, :][:, None]]))
+
+            if torch.cuda.is_available():
+                XXX = XXX.cuda()
             trained_pred_dist2 = likelihood2(m2(XXX))
             mu2 = trained_pred_dist2.mean.cpu()
             v2 = trained_pred_dist2.variance.cpu()
@@ -219,12 +226,12 @@ if __name__ in "__main__":
 
    # Load data
     minyear = 2000
-    maxyear = 2010
-    
-    train_stations = ['Banjar', 'Churah', 'Jogindernagar', 'Kalatop', 'Kangra', 'Sujanpur', 
-                  'Dadahu', 'Dhaula Kuan', 'Kandaghat', 'Nahan', 'Dehra',
-                  'Pachhad', 'Paonta Sahib', 'Rakuna', 'Jubbal', 'Kothai',
-                  'Mashobra', 'Rohru', 'Theog', 'Kalpa', 'Salooni', 'Hamirpur', 'Nadaun',]
+    maxyear = 2001
+
+    train_stations = ['Banjar', 'Churah', 'Jogindernagar', 'Kalatop', 'Kangra', 'Sujanpur',
+                      'Dadahu', 'Dhaula Kuan', 'Kandaghat', 'Nahan', 'Dehra',
+                      'Pachhad', 'Paonta Sahib', 'Rakuna', 'Jubbal', 'Kothai',
+                      'Mashobra', 'Rohru', 'Theog', 'Kalpa', 'Salooni', 'Hamirpur', 'Nadaun', ]
     hf_train_list = []
     for station in train_stations:
         station_ds = beas_sutlej_gauges.gauge_download(
@@ -232,7 +239,8 @@ if __name__ in "__main__":
         hf_train_list.append(station_ds.to_dataframe().dropna().reset_index())
     hf_train_df = pd.concat(hf_train_list)
 
-    val_stations = ['Banjar', 'Larji', 'Bhuntar', 'Sainj', 'Bhakra', 'Kasol', 'Suni', 'Pandoh', 'Janjehl', 'Rampur']
+    val_stations = ['Banjar', 'Larji', 'Bhuntar', 'Sainj',
+                    'Bhakra', 'Kasol', 'Suni', 'Pandoh', 'Janjehl', 'Rampur']
     val_list = []
     for station in val_stations:
         station_ds = beas_sutlej_gauges.gauge_download(
@@ -243,7 +251,7 @@ if __name__ in "__main__":
     era5_ds = era5.collect_ERA5('indus', minyear=minyear, maxyear=maxyear)
     #era5_df = era5.gauges_download(val_stations + train_stations, minyear=minyear, maxyear=maxyear)
 
-    lf_df= era5_ds.to_dataframe().dropna().reset_index()
+    lf_df = era5_ds.to_dataframe().dropna().reset_index()
     lf_df1 = lf_df[lf_df['lat'] <= 33.5]
     lf_df2 = lf_df1[lf_df1['lat'] >= 30]
     lf_df3 = lf_df2[lf_df2['lon'] >= 75.5]
@@ -274,14 +282,16 @@ if __name__ in "__main__":
     x_val1 = scaler.transform(x_val)
 
     # Make tensors
-    train_x_lf, train_y_lf = torch.Tensor(x_train_lf1), torch.Tensor(y_train_lf)
-    train_x_hf, train_y_hf = torch.Tensor(x_train_hf1), torch.Tensor(y_train_hf)
+    train_x_lf, train_y_lf = torch.Tensor(
+        x_train_lf1), torch.Tensor(y_train_lf)
+    train_x_hf, train_y_hf = torch.Tensor(
+        x_train_hf1), torch.Tensor(y_train_hf)
     val_x, val_y = torch.Tensor(x_val1), torch.Tensor(y_val)
 
     # Set to CUDA
     if torch.cuda.is_available():
         train_x_hf, train_y_hf = train_x_hf.cuda(), train_y_hf.cuda()
-        train_x_lf, train_y_lf = train_x_lf.cuda(), train_y_lf.cuda(), 
+        train_x_lf, train_y_lf = train_x_lf.cuda(), train_y_lf.cuda(),
         val_x, val_y = val_x.cuda(), val_y.cuda()
 
     # Train and evaluate model
@@ -295,14 +305,14 @@ if __name__ in "__main__":
     mu1, v1 = evaluate_first_lvl(m1, likelihood1, train_x_hf)
     m2, likelihood2 = train_second_lvl(
         train_x_hf, train_y_hf, mu1, 800, base_kernel)
-    mu0, v0, mu2, v2 = evaluate_second_lvl(m1, likelihood1, m2, 
-                                likelihood2, torch.Tensor(x_val1), nsamples=100)
+    mu0, v0, mu2, v2 = evaluate_second_lvl(m1, likelihood1, m2,
+                                           likelihood2, torch.Tensor(x_val1), nsamples=100)
 
     # Metrics
     y_pred = sp.special.inv_boxcox(np.array(mu0), lf_lambda).reshape(-1)
     y_true = sp.special.inv_boxcox(y_val, lf_lambda).reshape(-1)
     r2 = r2_score(y_true, y_pred)
-    rmse_all, rmse_p5, rmse_p95 =  rmses(y_pred, y_true)
+    rmse_all, rmse_p5, rmse_p95 = rmses(y_pred, y_true)
 
     print('Mean R2 = ', r2)
     print('Mean RMSE = ', rmse_all)
