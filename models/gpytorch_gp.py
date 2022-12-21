@@ -1,14 +1,14 @@
+import sys
+sys.path.append('/data/hpcdata/users/kenzi22/')
+
 from load import beas_sutlej_gauges
 from sklearn.preprocessing import MinMaxScaler
 from matplotlib import pyplot as plt
 import gpytorch
 import torch
 import pandas as pd
+import numpy as np
 import scipy as sp
-
-import sys
-sys.path.append('/Users/kenzatazi/Documents/CDT/Code')
-
 
 class GPRegressionModel(gpytorch.models.ExactGP):
     """ GPyTorch GP regression class"""
@@ -17,7 +17,6 @@ class GPRegressionModel(gpytorch.models.ExactGP):
         super(GPRegressionModel, self).__init__(train_x, train_y, likelihood)
 
         self.mean_module = gpytorch.means.ConstantMean()
-        # * gpytorch.kernels.PeriodicKernel() + gpytorch.kernels.RBFKernel(1))
         self.covar_module = gpytorch.kernels.ScaleKernel(
             gpytorch.kernels.RBFKernel(ard_num_dims=4))
 
@@ -30,15 +29,17 @@ class GPRegressionModel(gpytorch.models.ExactGP):
 def gpytorch_gp(train_x, train_y, training_iter):
     """ Create model instance and train """
 
-    # torch.ones(train_x.shape[0]) * 0.5)
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     model = GPRegressionModel(train_x, train_y, likelihood)
 
-    training_iter = training_iter
+    if torch.cuda.is_available():
+        model = model.cuda()
+        likelihood = likelihood.cuda()
 
     # Find optimal model hyperparameters
     model.train()
     likelihood.train()
+    training_iter = training_iter
 
     # Use the adam optimizer
     # Includes GaussianLikelihood parameters
@@ -65,12 +66,11 @@ def gpytorch_gp(train_x, train_y, training_iter):
     return model, likelihood
 
 
-def model_eval(model, likelihood, x_val):
+def model_eval(model, likelihood, val_x):
     model.eval()
     likelihood.eval()
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        y_test = torch.Tensor(y_val)
-        trained_pred_dist = likelihood(model(torch.Tensor(x_val)))
+        trained_pred_dist = likelihood(model(val_x))
         y_pred = trained_pred_dist.mean
         y_std = trained_pred_dist.stddev
 
@@ -114,9 +114,9 @@ if __name__ in "__main__":
 
     # Splitting
     x_train_hf = hf_train_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
-    y_train_hf = hf_train_df['tp_tr'].values.reshape(-1, 1)
+    y_train_hf = hf_train_df['tp_tr'].values.reshape(-1)
     x_val = val_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
-    y_val = val_df['tp_tr'].values.reshape(-1, 1)
+    y_val = val_df['tp_tr'].values.reshape(-1)
 
     # Scaling
     scaler = MinMaxScaler().fit(x_train_hf)
@@ -125,15 +125,20 @@ if __name__ in "__main__":
 
     # Make tensors
     train_x, train_y = torch.Tensor(
-        x_train_hf), torch.Tensor(y_train_hf.reshape(-1))
+        x_train_hf), torch.Tensor(y_train_hf)
+    val_x, val_y = torch.Tensor(
+        x_val), torch.Tensor(y_val)
+
+    if torch.cuda.is_available():
+        train_x, train_y, val_x, val_y = train_x.cuda(), train_y.cuda(), val_x.cuda(), val_x.cuda()
 
     # Train and evaluate model
     training_iter = 30
     model, likelihood = gpytorch_gp(train_x, train_y, training_iter)
-    y_pred, y_std = model_eval(model, likelihood, x_val)
+    y_pred, y_std = model_eval(model, likelihood, val_x)
 
     # Metrics
-    y_pred = sp.special.inv_boxcox(np.array(mu0), lf_lambda).reshape(-1)
+    y_pred = sp.special.inv_boxcox(np.array(y_pred), lf_lambda).reshape(-1)
     y_true = sp.special.inv_boxcox(y_val, lf_lambda).reshape(-1)
     r2 = r2_score(y_true, y_pred)
     rmse_all, rmse_p5, rmse_p95 =  rmses(y_pred, y_true)

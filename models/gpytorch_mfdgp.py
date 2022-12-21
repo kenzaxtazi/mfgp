@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/data/hpcdata/users/kenzi22/')
+
 from load import beas_sutlej_gauges, era5
 from sklearn.preprocessing import MinMaxScaler
 from matplotlib import pyplot as plt
@@ -7,18 +10,19 @@ import pandas as pd
 import numpy as np
 import scipy as sp
 from sklearn.metrics import r2_score
-
-import sys
-sys.path.append('/Users/kenzatazi/Documents/CDT/Code')
-
-base_kernel = gpytorch.kernels.RBFKernel(
-    ard_num_dims=4, active_dims=[0, 1, 2, 3])
+from utils.metrics import rmses
 
 
 class LF_gp(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood):
         super(LF_gp, self).__init__(train_x, train_y, likelihood)
+
+        grid_size = gpytorch.utils.grid.choose_grid_size(train_x,1.0)
+
+        dim = train_x.shape[1]
         self.mean_module = gpytorch.means.ConstantMean()
+        base_kernel = gpytorch.kernels.MaternKernel(nu=2.5,
+            ard_num_dims=dim, active_dims=np.arange(dim))
         self.covar_module = base_kernel
 
     def forward(self, x):
@@ -28,12 +32,18 @@ class LF_gp(gpytorch.models.ExactGP):
 
 
 class HF_nonlin_gp(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood):
-        super(HF_nonlin_gp, self).__init__(train_x, train_y, likelihood)
+    def __init__(self, train_x, train_y, likelihood, base_kernel):
+        super(HF_nonlin_gp, self).__init__(
+            train_x, train_y, likelihood)
+
+        map_kernel = gpytorch.kernels.RBFKernel(1, active_dims=[4]) * gpytorch.kernels.RBFKernel(
+            ard_num_dims=4, active_dims=[0, 1, 2, 3])  # outputscale_prior=gpytorch.priors.NormalPrior(1, 1))
+        bias_kernel = gpytorch.kernels.RBFKernel(
+            ard_num_dims=4, active_dims=[0, 1, 2, 3])  # outputscale_prior=gpytorch.priors.NormalPrior(0.01, 0.01))
 
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(1, active_dims=[4])
-                                                         * base_kernel + base_kernel)
+        self.covar_module = gpytorch.kernels.ScaleKernel(
+            map_kernel + bias_kernel)
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -41,12 +51,11 @@ class HF_nonlin_gp(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
-class HF_lin_gpmodel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood):
-        super(HF_lin_gpmodel, self).__init__(train_x, train_y, likelihood)
+class HF_lin_gp(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood, base_kernel):
+        super(HF_lin_gp, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(1, active_dims=[4])
-                                                         + base_kernel)
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=2.5, active_dims=[4])) + base_kernel
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -55,11 +64,11 @@ class HF_lin_gpmodel(gpytorch.models.ExactGP):
 
 
 class HF_custom_gpmodel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood):
+    def __init__(self, train_x, train_y, likelihood, base_kernel):
         super(HF_custom_gpmodel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(1, active_dims=[4])
-                                                         * base_kernel)
+        self.covar_module = gpytorch.kernels.ScaleKernel(
+            gpytorch.kernels.RBFKernel(ard_num_dims=5))
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -69,8 +78,13 @@ class HF_custom_gpmodel(gpytorch.models.ExactGP):
 
 def train_first_lvl(train_x_lf, train_y_lf, training_iter):
 
-    likelihood1 = gpytorch.likelihoods.GaussianLikelihood()
+    likelihood1 = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
+        noise=torch.ones(len(train_x_lf)) * 0.01)
     m1 = LF_gp(train_x_lf, train_y_lf, likelihood1)
+
+    if torch.cuda.is_available():
+        m1 = m1.cuda()
+        likelihood1 = likelihood1.cuda()
 
     # Find optimal model hyperparameters
     m1.train()
@@ -91,7 +105,7 @@ def train_first_lvl(train_x_lf, train_y_lf, training_iter):
         # Calc loss and backprop gradients
         loss1 = -mll1(output1, train_y_lf)
         loss1.backward()
-        if i % 10 == 1:
+        if i % 10 == 0:
             print('Iter %d/%d - Loss: %.3f' % (  # lengthscale: %.3f   noise: %.3f' % (
                 i + 1, training_iter, loss1.item(),
                 # model.covar_module.base_kernel.lengthscale.item(),
@@ -106,20 +120,31 @@ def evaluate_first_lvl(m1, likelihood1, train_x_hf):
     # Get into evaluation (predictive posterior) mode
     m1.eval()
     likelihood1.eval()
+
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         trained_pred_dist1 = likelihood1(m1(train_x_hf))
         mu1 = trained_pred_dist1.mean
         v1 = trained_pred_dist1.variance
+    
     return mu1, v1
 
 
-def train_second_lvl(train_x_hf, train_y_hf, mu1, training_iter):
+def train_second_lvl(train_x_hf, train_y_hf, mu1, training_iter, base_kernel):
 
-    XX = torch.Tensor(
-        np.hstack([np.array(train_x_hf), np.array(mu1).reshape(-1, 1)]))
+    x_arr = np.array(train_x_hf.cpu())
+    mu1_arr = np.array(mu1.cpu()).reshape(-1, 1)
+    XX = torch.Tensor(np.hstack([x_arr, mu1_arr]))
 
-    likelihood2 = gpytorch.likelihoods.GaussianLikelihood()
-    m2 = HF_nonlin_gp(XX, train_y_hf, likelihood2)
+    if torch.cuda.is_available():
+        XX = XX.cuda()
+
+    likelihood2 = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
+        noise=torch.ones(len(train_x_lf)) * 0.01)
+    m2 = HF_lin_gp(XX, train_y_hf, likelihood2, base_kernel)
+
+    if torch.cuda.is_available():
+        m2 = m2.cuda()
+        likelihood2 = likelihood2.cuda()
 
     # Find optimal model hyperparameters
     m2.train()
@@ -141,17 +166,16 @@ def train_second_lvl(train_x_hf, train_y_hf, mu1, training_iter):
         loss = -mll2(output2, train_y_hf)
         loss.backward()
         if i % 10 == 0:
-            print('Iter %d/%d - Loss: %.3f' % (  # lengthscale: %.3f   noise: %.3f' % (
-                i + 1, training_iter, loss.item(),
-                # model.covar_module.base_kernel.lengthscale.item(),
-                # model.likelihood.noise.item()
-            ))
+            print('Iter %d/%d - Loss: %.3f' % (  # '  noise: %.3f # lengthscale: %.3f   % (
+                i + 1, training_iter, loss.item(),))
+            # model.covar_module.base_kernel.lengthscale.item(),
+            # m2.likelihood.noise.item()))
         optimizer2.step()
 
     return m2, likelihood2
 
 
-def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, x_val, nsamples=1000):
+def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, val_x, nsamples=1000):
 
     # Get into evaluation (predictive posterior) mode
     m2.eval()
@@ -159,12 +183,14 @@ def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, x_val, nsamples=1000):
 
     # Predict at validation points
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
-
-        ntest = x_val.shape[0]
-        trained_pred_dist0 = likelihood1(m1(torch.Tensor(x_val)))
-        mu0 = trained_pred_dist0.mean
-        v0 = trained_pred_dist0.variance
-        C0 = trained_pred_dist0.covariance_matrix
+        
+        val_arr = np.array(val_x.cpu())
+        ntest = val_arr.shape[0]
+        
+        trained_pred_dist0 = likelihood1(m1(val_x.cuda()))
+        mu0 = trained_pred_dist0.mean.cpu()
+        v0 = trained_pred_dist0.variance.cpu()
+        C0 = trained_pred_dist0.covariance_matrix.cpu()
 
         Z = np.random.multivariate_normal(mu0.flatten(), C0, nsamples)
         tmp_m = np.zeros((nsamples, ntest))
@@ -172,17 +198,17 @@ def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, x_val, nsamples=1000):
 
         # Push samples through f_2
         for i in range(0, nsamples):
-            XXX = torch.Tensor(np.hstack([x_val, np.array(Z)[i, :][:, None]]))
+            XXX = torch.Tensor(
+                np.hstack([val_arr, np.array(Z)[i, :][:, None]])).cuda()
             trained_pred_dist2 = likelihood2(m2(XXX))
-            mu2 = trained_pred_dist2.mean
-            v2 = trained_pred_dist2.variance
+            mu2 = trained_pred_dist2.mean.cpu()
+            v2 = trained_pred_dist2.variance.cpu()
             tmp_m[i, :] = mu2.flatten()
             tmp_v[i, :] = v2.flatten()
 
         # get mean and variance at X3
         mu3 = np.mean(tmp_m, axis=0)
         v3 = np.mean(tmp_v, axis=0) + np.var(tmp_m, axis=0)
-        mu3 = mu3[:, None]
         v3 = np.abs(v3[:, None])
 
     return mu0, v0, mu3, v3
@@ -192,13 +218,12 @@ if __name__ in "__main__":
 
    # Load data
     minyear = 2000
-    maxyear = 2005
-
-    train_stations = ['Bharmaur', 'Churah', 'Jogindernagar', 'Kalatop', 'Kangra',
-                      'Palampur', 'Salooni', 'Dehra', 'Hamirpur', 'Nadaun',
-                      'Sujanpur', 'Dadahu', 'Dhaula Kuan', 'Kandaghat', 'Nahan',
-                      'Pachhad', 'Paonta Sahib', 'Rakuna', 'Jubbal', 'Kothai',
-                      'Mashobra', 'Rohru', 'Theog', 'Kalpa']
+    maxyear = 2001
+    
+    train_stations = ['Banjar', 'Churah', 'Jogindernagar', 'Kalatop', 'Kangra', 'Sujanpur', 
+                  'Dadahu', 'Dhaula Kuan', 'Kandaghat', 'Nahan', 'Dehra',
+                  'Pachhad', 'Paonta Sahib', 'Rakuna', 'Jubbal', 'Kothai',
+                  'Mashobra', 'Rohru', 'Theog', 'Kalpa', 'Salooni', 'Hamirpur', 'Nadaun',]
     hf_train_list = []
     for station in train_stations:
         station_ds = beas_sutlej_gauges.gauge_download(
@@ -206,8 +231,7 @@ if __name__ in "__main__":
         hf_train_list.append(station_ds.to_dataframe().dropna().reset_index())
     hf_train_df = pd.concat(hf_train_list)
 
-    val_stations = ['Banjar', 'Larji', 'Bhuntar', 'Sainj', 'Bhakra',
-                    'Kasol', 'Suni', 'Pandoh', 'Janjehl', 'Rampur']
+    val_stations = ['Banjar', 'Larji', 'Bhuntar', 'Sainj', 'Bhakra', 'Kasol', 'Suni', 'Pandoh', 'Janjehl', 'Rampur']
     val_list = []
     for station in val_stations:
         station_ds = beas_sutlej_gauges.gauge_download(
@@ -215,27 +239,32 @@ if __name__ in "__main__":
         val_list.append(station_ds.to_dataframe().dropna().reset_index())
     val_df = pd.concat(val_list)
 
-    era5_ds = era5.collect_ERA5(
-        'beas_sutlej', minyear=minyear, maxyear=maxyear)
-    lf_train_df = era5_ds.to_dataframe().dropna().reset_index()
+    era5_ds = era5.collect_ERA5('indus', minyear=minyear, maxyear=maxyear)
+    #era5_df = era5.gauges_download(val_stations + train_stations, minyear=minyear, maxyear=maxyear)
+
+    lf_df= era5_ds.to_dataframe().dropna().reset_index()
+    lf_df1 = lf_df[lf_df['lat'] <= 33.5]
+    lf_df2 = lf_df1[lf_df1['lat'] >= 30]
+    lf_df3 = lf_df2[lf_df2['lon'] >= 75.5]
+    lf_train_df = lf_df3[lf_df3['lon'] <= 83]
 
     # Prepare data
 
     # Transformations
     lf_train_df['tp_tr'], lf_lambda = sp.stats.boxcox(
         lf_train_df['tp'].values + 0.01)
-    hf_train_df['tp_tr'], hf_lambda = sp.stats.boxcox(
-        hf_train_df['tp'].values + 0.01)
+    hf_train_df['tp_tr'] = sp.stats.boxcox(
+        hf_train_df['tp'].values + 0.01, lmbda=lf_lambda)
     val_df['tp_tr'] = sp.stats.boxcox(
-        val_df['tp'].values + 0.01, lmbda=hf_lambda)
+        val_df['tp'].values + 0.01, lmbda=lf_lambda)
 
     # Splitting
     x_train_lf = lf_train_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
-    y_train_lf = lf_train_df['tp_tr'].values.reshape(-1, 1)
+    y_train_lf = lf_train_df['tp_tr'].values.reshape(-1)
     x_train_hf = hf_train_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
-    y_train_hf = hf_train_df['tp_tr'].values.reshape(-1, 1)
+    y_train_hf = hf_train_df[['tp_tr']].values.reshape(-1)
     x_val = val_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
-    y_val = val_df['tp_tr'].values.reshape(-1, 1)
+    y_val = val_df['tp_tr'].values.reshape(-1)
 
     # Scaling
     scaler = MinMaxScaler().fit(x_train_hf)
@@ -244,61 +273,37 @@ if __name__ in "__main__":
     x_val1 = scaler.transform(x_val)
 
     # Make tensors
-    train_x_lf, train_y_lf = torch.Tensor(
-        x_train_lf1), torch.Tensor(y_train_lf.reshape(-1))
-    train_x_hf, train_y_hf = torch.Tensor(
-        x_train_hf1), torch.Tensor(y_train_hf.reshape(-1))
+    train_x_lf, train_y_lf = torch.Tensor(x_train_lf1), torch.Tensor(y_train_lf)
+    train_x_hf, train_y_hf = torch.Tensor(x_train_hf1), torch.Tensor(y_train_hf)
+    val_x, val_y = torch.Tensor(x_val1), torch.Tensor(y_val)
+
+    # Set to CUDA
+    if torch.cuda.is_available():
+        train_x_hf, train_y_hf = train_x_hf.cuda(), train_y_hf.cuda()
+        train_x_lf, train_y_lf = train_x_lf.cuda(), train_y_lf.cuda(), 
+        val_x, val_y = val_x.cuda(), val_y.cuda()
 
     # Train and evaluate model
-    training_iter = 100
-    m1, likelihood1 = train_first_lvl(train_x_lf, train_y_lf, training_iter)
+
+    training_iter = 400
+    base_kernel = gpytorch.kernels.MaternKernel(
+        ard_num_dims=4, active_dims=[0, 1, 2, 3])
+
+    m1, likelihood1 = train_first_lvl(
+        train_x_lf, train_y_lf, 200)
     mu1, v1 = evaluate_first_lvl(m1, likelihood1, train_x_hf)
     m2, likelihood2 = train_second_lvl(
-        train_x_hf, train_y_hf, mu1, training_iter)
-    mu0, v0, mu2, v2 = evaluate_second_lvl(
-        m1, likelihood1, m2, likelihood2, x_val1, nsamples=100)
-    mu0_, v0_, mu2_, v2_ = evaluate_second_lvl(
-        m1, likelihood1, m2, likelihood2, x_train_hf1, nsamples=100)
+        train_x_hf, train_y_hf, mu1, 800, base_kernel)
+    mu0, v0, mu2, v2 = evaluate_second_lvl(m1, likelihood1, m2, 
+                                likelihood2, torch.Tensor(x_val1), nsamples=100)
 
-    plt.figure()
-    plt.scatter(x_val1[:10, 0], y_val[:10])
-    plt.scatter(x_val1[:10, 0], mu2[:10])
-    plt.savefig('gpytorch_mfdgp_example_output_2000-2005_val.png')
+    # Metrics
+    y_pred = sp.special.inv_boxcox(np.array(mu0), lf_lambda).reshape(-1)
+    y_true = sp.special.inv_boxcox(y_val, lf_lambda).reshape(-1)
+    r2 = r2_score(y_true, y_pred)
+    rmse_all, rmse_p5, rmse_p95 =  rmses(y_pred, y_true)
 
-    plt.figure()
-    plt.scatter(x_val1[:10, 0], y_train_hf[:10])
-    plt.scatter(x_val1[:10, 0], mu2_[:10])
-    plt.savefig('gpytorch_mfdgp_example_output_2000-2005_train.png')
-
-
-def r2_low_vs_high(val_df, mu0, mu2):
-
-    val_df['mu0'] = mu0
-    val_df['mu2'] = mu2
-
-    val_dfs = [x for _, x in val_df.groupby(['lon', 'lat', 'z'])]
-    R2_hf = []
-    R2_lf = []
-
-    for df in val_dfs:
-        xval_ = df[['time', 'lat', 'lon', 'z']
-                   ].values.reshape(-1, 4)  # 'slope'
-        yval_ = df['tp_tr'].values.reshape(-1, 1)
-
-        # ALL
-        y_pred_lf = np.nan_to_num(sp.special.inv_boxcox(
-            df['mu0'].values, lf_lambda).reshape(-1), nan=0)
-        y_pred_hf = np.nan_to_num(sp.special.inv_boxcox(
-            df['mu2'].values, hf_lambda).reshape(-1), nan=0)
-        y_true_ = sp.special.inv_boxcox(yval_, hf_lambda).reshape(-1)
-        R2_hf.append(r2_score(y_true_, y_pred_hf))
-        R2_lf.append(r2_score(y_true_, y_pred_lf))
-
-    np.savetxt('table3_ypred_lf_r2_2000-2005.csv', R2_lf)
-    np.savetxt('table3_ypred_hf_r2_2000-2005.csv', R2_hf)
-
-    plt.figure()
-    plt.scatter(R2_lf, R2_hf)
-    plt.xlabel('LF R2')
-    plt.ylabel('HF R2')
-    plt.savefig('lf_v_ hf.png')
+    print('Mean R2 = ', r2)
+    print('Mean RMSE = ', rmse_all)
+    print('5th RMSE = ', rmse_p5)
+    print('95th RMSE = ', rmse_p95)
