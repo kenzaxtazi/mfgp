@@ -1,5 +1,6 @@
 import sys
 sys.path.append('/data/hpcdata/users/kenzi22/')
+sys.path.append('/data/hpcdata/users/kenzi22/mfdgp/')
 
 from load import beas_sutlej_gauges, era5
 from sklearn.preprocessing import MinMaxScaler
@@ -17,13 +18,13 @@ class LF_gp(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood):
         super(LF_gp, self).__init__(train_x, train_y, likelihood)
 
-        grid_size = gpytorch.utils.grid.choose_grid_size(train_x,1.0)
+        grid_size = gpytorch.utils.grid.choose_grid_size(train_x)
 
         dim = train_x.shape[1]
         self.mean_module = gpytorch.means.ConstantMean()
         base_kernel = gpytorch.kernels.MaternKernel(nu=2.5,
             ard_num_dims=dim, active_dims=np.arange(dim))
-        self.covar_module = base_kernel
+        self.covar_module = gpytorch.kernels.GridInterpolationKernel(base_kernel, grid_size=grid_size, num_dims=dim)
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -218,7 +219,7 @@ if __name__ in "__main__":
 
    # Load data
     minyear = 2000
-    maxyear = 2001
+    maxyear = 2010
     
     train_stations = ['Banjar', 'Churah', 'Jogindernagar', 'Kalatop', 'Kangra', 'Sujanpur', 
                   'Dadahu', 'Dhaula Kuan', 'Kandaghat', 'Nahan', 'Dehra',
