@@ -132,7 +132,13 @@ if __name__ in "__main__":
     model, likelihood = gpytorch_gp(train_x, train_y, training_iter)
     y_pred, y_std = model_eval(model, likelihood, x_val)
 
-    plt.figure()
-    plt.scatter(x_val[:10, 0], y_val[:10])
-    plt.scatter(x_val[:10, 0], y_pred[:10])
-    plt.savefig('gpytorch_gp_example_output.png')
+    # Metrics
+    y_pred = sp.special.inv_boxcox(np.array(mu0), lf_lambda).reshape(-1)
+    y_true = sp.special.inv_boxcox(y_val, lf_lambda).reshape(-1)
+    r2 = r2_score(y_true, y_pred)
+    rmse_all, rmse_p5, rmse_p95 =  rmses(y_pred, y_true)
+
+    print('Mean R2 = ', r2)
+    print('Mean RMSE = ', rmse_all)
+    print('5th RMSE = ', rmse_p5)
+    print('95th RMSE = ', rmse_p95)
