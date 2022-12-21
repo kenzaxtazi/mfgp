@@ -1,4 +1,4 @@
-from utils.metrics import rmses
+from utils.metrics import rmses, msll
 from sklearn.metrics import r2_score
 import scipy as sp
 import numpy as np
@@ -205,9 +205,9 @@ def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, val_x, nsamples=1000):
         for i in range(0, nsamples):
             XXX = torch.Tensor(
                 np.hstack([val_arr, np.array(Z)[i, :][:, None]]))
-
             if torch.cuda.is_available():
                 XXX = XXX.cuda()
+
             trained_pred_dist2 = likelihood2(m2(XXX))
             mu2 = trained_pred_dist2.mean.cpu()
             v2 = trained_pred_dist2.variance.cpu()
@@ -217,6 +217,7 @@ def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, val_x, nsamples=1000):
         # get mean and variance at X3
         mu3 = np.mean(tmp_m, axis=0)
         v3 = np.mean(tmp_v, axis=0) + np.var(tmp_m, axis=0)
+        mu3 = mu3[:, None]
         v3 = np.abs(v3[:, None])
 
     return mu0, v0, mu3, v3
@@ -304,17 +305,19 @@ if __name__ in "__main__":
         train_x_lf, train_y_lf, 200)
     mu1, v1 = evaluate_first_lvl(m1, likelihood1, train_x_hf)
     m2, likelihood2 = train_second_lvl(
-        train_x_hf, train_y_hf, mu1, 800, base_kernel)
+        train_x_hf, train_y_hf, mu1, 1000, base_kernel)
     mu0, v0, mu2, v2 = evaluate_second_lvl(m1, likelihood1, m2,
-                                           likelihood2, torch.Tensor(x_val1), nsamples=100)
+                                           likelihood2, val_x, nsamples=100)
 
     # Metrics
     y_pred = sp.special.inv_boxcox(np.array(mu0), lf_lambda).reshape(-1)
     y_true = sp.special.inv_boxcox(y_val, lf_lambda).reshape(-1)
     r2 = r2_score(y_true, y_pred)
     rmse_all, rmse_p5, rmse_p95 = rmses(y_pred, y_true)
+    log_loss = msll(y_val, mu2, v2)
 
     print('Mean R2 = ', r2)
     print('Mean RMSE = ', rmse_all)
     print('5th RMSE = ', rmse_p5)
     print('95th RMSE = ', rmse_p95)
+    print('MSLL = ', log_loss)

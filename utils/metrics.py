@@ -1,6 +1,7 @@
 import scipy as sp
 import numpy as np
 import pandas as pd
+import gpytorch
 from sklearn.metrics import r2_score, mean_squared_error
 
 
@@ -27,7 +28,7 @@ def rmses(y_pred, y_true):
 def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, lmbda: float):
     """ 
     Calculate R2 values for different locations in validation set.
-    
+
     mu0 : mean posterior distribution for low fidelity
     mu2 : mean posterior distribution for high fidelity
     x_val1 : normalised x values
@@ -44,7 +45,7 @@ def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, lmbda: float)
     R2_lf = []
 
     for df in val_df1s:
-        x_val = df[['time', 'lon', 'lat', 'z']].values.reshape(-1,4)
+        x_val = df[['time', 'lon', 'lat', 'z']].values.reshape(-1, 4)
         y_val = df['tp_tr'].values.reshape(-1)
         y_pred0_lf = df['mu0'].values.reshape(-1)
         y_pred0_hf = df['mu2'].values.reshape(-1)
@@ -57,3 +58,13 @@ def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, lmbda: float)
 
     np.savetxt('table3_ypred_lf_r2_2000-2010.csv', R2_lf)
     np.savetxt('table3_ypred_hf_r2_2000-2010.csv', R2_hf)
+
+
+def msll(y_true, y_pred, v_pred) -> int:
+    # set everything to numpy arrays
+    y_true, y_pred, v_pred = np.array(
+        y_true), np.array(y_pred), np.array(v_pred)
+    std_pred = np.sqrt(v_pred)
+    first_term = 0.5 * np.log(2 * np.pi * std_pred**2)
+    second_term = ((y_true - y_pred)**2)/(2 * std_pred**2)
+    return np.mean(first_term + second_term)

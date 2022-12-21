@@ -1,14 +1,16 @@
+import scipy as sp
+import numpy as np
+import pandas as pd
+import torch
+import gpytorch
+from matplotlib import pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from load import beas_sutlej_gauges
+from utils.metrics import rmses, msll
+from sklearn.metrics import r2_score
 import sys
 sys.path.append('/data/hpcdata/users/kenzi22/')
 
-from load import beas_sutlej_gauges
-from sklearn.preprocessing import MinMaxScaler
-from matplotlib import pyplot as plt
-import gpytorch
-import torch
-import pandas as pd
-import numpy as np
-import scipy as sp
 
 class GPRegressionModel(gpytorch.models.ExactGP):
     """ GPyTorch GP regression class"""
@@ -18,6 +20,8 @@ class GPRegressionModel(gpytorch.models.ExactGP):
 
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = gpytorch.kernels.ScaleKernel(
+            gpytorch.kernels.PeriodicKernel(active_dims=[0]) *
+            gpytorch.kernels.RBFKernel(active_dims=[0]) +
             gpytorch.kernels.RBFKernel(ard_num_dims=4))
 
     def forward(self, x):
@@ -81,7 +85,7 @@ if __name__ in "__main__":
 
     # Load data
     minyear = 2000
-    maxyear = 2001
+    maxyear = 2010
 
     train_stations = ['Bharmaur', 'Churah', 'Jogindernagar', 'Kalatop', 'Kangra',
                       'Palampur', 'Salooni', 'Dehra', 'Hamirpur', 'Nadaun',
@@ -107,10 +111,10 @@ if __name__ in "__main__":
     # Prepare data
 
     # Transformations
-    hf_train_df['tp_tr'], hf_lambda = sp.stats.boxcox(
+    hf_train_df['tp_tr'], lmbda = sp.stats.boxcox(
         hf_train_df['tp'].values + 0.1)
     val_df['tp_tr'] = sp.stats.boxcox(
-        val_df['tp'].values + 0.1, lmbda=hf_lambda)
+        val_df['tp'].values + 0.1, lmbda=lmbda)
 
     # Splitting
     x_train_hf = hf_train_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
@@ -130,20 +134,23 @@ if __name__ in "__main__":
         x_val), torch.Tensor(y_val)
 
     if torch.cuda.is_available():
-        train_x, train_y, val_x, val_y = train_x.cuda(), train_y.cuda(), val_x.cuda(), val_x.cuda()
+        train_x, train_y, val_x, val_y = train_x.cuda(
+        ), train_y.cuda(), val_x.cuda(), val_x.cuda()
 
     # Train and evaluate model
     training_iter = 30
     model, likelihood = gpytorch_gp(train_x, train_y, training_iter)
-    y_pred, y_std = model_eval(model, likelihood, val_x)
+    y_pred0, y_std0 = model_eval(model, likelihood, val_x)
 
     # Metrics
-    y_pred = sp.special.inv_boxcox(np.array(y_pred), lf_lambda).reshape(-1)
-    y_true = sp.special.inv_boxcox(y_val, lf_lambda).reshape(-1)
+    y_pred = sp.special.inv_boxcox(np.array(y_pred0), lmbda).reshape(-1)
+    y_true = sp.special.inv_boxcox(y_val, lmbda).reshape(-1)
     r2 = r2_score(y_true, y_pred)
-    rmse_all, rmse_p5, rmse_p95 =  rmses(y_pred, y_true)
+    rmse_all, rmse_p5, rmse_p95 = rmses(y_pred, y_true)
+    log_loss = msll(y_val, y_pred0, y_std0)
 
     print('Mean R2 = ', r2)
     print('Mean RMSE = ', rmse_all)
     print('5th RMSE = ', rmse_p5)
     print('95th RMSE = ', rmse_p95)
+    print('MSLL = ', log_loss)
