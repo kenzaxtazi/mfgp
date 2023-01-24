@@ -1,0 +1,420 @@
+import sys
+sys.path.append('/data/hpcdata/users/kenzi22/')
+
+from load import beas_sutlej_gauges, era5, data_dir
+from sklearn.preprocessing import MinMaxScaler
+from matplotlib import pyplot as plt
+import gpytorch
+import torch
+import pandas as pd
+import numpy as np
+import scipy as sp
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import KFold
+from utils.metrics import msll
+
+
+class LF_gp(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood):
+        super(LF_gp, self).__init__(train_x, train_y, likelihood)
+
+        dim = train_x.shape[1]
+        self.mean_module = gpytorch.means.ConstantMean()
+        base_kernel = gpytorch.kernels.RBFKernel(
+            ard_num_dims=dim, active_dims=np.arange(dim))
+        self.covar_module = base_kernel
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+
+class HF_nonlin_gp(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood, base_kernel):
+        super(HF_nonlin_gp, self).__init__(
+            train_x, train_y, likelihood)
+
+        map_kernel = gpytorch.kernels.RBFKernel(1, active_dims=[4]) * gpytorch.kernels.RBFKernel(
+            ard_num_dims=4, active_dims=[0, 1, 2, 3])  # outputscale_prior=gpytorch.priors.NormalPrior(1, 1))
+        bias_kernel = gpytorch.kernels.RBFKernel(
+            ard_num_dims=4, active_dims=[0, 1, 2, 3])  # outputscale_prior=gpytorch.priors.NormalPrior(0.01, 0.01))
+
+        self.mean_module = gpytorch.means.ConstantMean()
+        self.covar_module = gpytorch.kernels.ScaleKernel(
+            map_kernel + bias_kernel)
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+
+class HF_lin_gp(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood, base_kernel):
+        super(HF_lin_gp, self).__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.ConstantMean()
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=2.5, active_dims=[4]) +
+        base_kernel)
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+
+class HF_custom_gpmodel(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood, base_kernel):
+        super(HF_custom_gpmodel, self).__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.ConstantMean()
+        self.covar_module = gpytorch.kernels.ScaleKernel(
+            gpytorch.kernels.RBFKernel(ard_num_dims=5))
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+
+def train_first_lvl(train_x_lf, train_y_lf, training_iter):
+
+    likelihood1 = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
+        noise=torch.ones(len(train_x_lf)) * 0.01)
+    m1 = LF_gp(train_x_lf, train_y_lf, likelihood1)
+
+    # Find optimal model hyperparameters
+    m1.train()
+    likelihood1.train()
+
+    # Use the adam optimizer
+    # Includes GaussianLikelihood parameters
+    optimizer1 = torch.optim.Adam(m1.parameters(), lr=0.1)
+
+    # "Loss" for GPs - the marginal log likelihood
+    mll1 = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood1, m1)
+
+    for i in range(training_iter):
+        # Zero gradients from previous iteration
+        optimizer1.zero_grad()
+        # Output from model
+        output1 = m1(train_x_lf)
+        # Calc loss and backprop gradients
+        loss1 = -mll1(output1, train_y_lf)
+        loss1.backward()
+        if i % 10 == 0:
+            print('Iter %d/%d - Loss: %.3f' % (  # lengthscale: %.3f   noise: %.3f' % (
+                i + 1, training_iter, loss1.item(),
+                # model.covar_module.base_kernel.lengthscale.item(),
+                # model.likelihood.noise.item()
+            ))
+        optimizer1.step()
+
+    return m1, likelihood1
+
+
+def evaluate_first_lvl(m1, likelihood1, train_x_hf):
+    # Get into evaluation (predictive posterior) mode
+    m1.eval()
+    likelihood1.eval()
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        trained_pred_dist1 = likelihood1(m1(train_x_hf))
+        mu1 = trained_pred_dist1.mean
+        v1 = trained_pred_dist1.variance
+    return mu1, v1
+
+
+def train_second_lvl(train_x_hf, train_y_hf, mu1, training_iter, base_kernel):
+    XX = torch.Tensor(
+        np.hstack([np.array(train_x_hf), np.array(mu1).reshape(-1, 1)]))
+
+    likelihood2 = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
+        noise=torch.ones(len(train_x_lf)) * 0.01)
+    m2 = HF_lin_gp(XX, train_y_hf, likelihood2, base_kernel)
+
+    # Find optimal model hyperparameters
+    m2.train()
+    likelihood2.train()
+
+    # Use the adam optimizer
+    # Includes GaussianLikelihood parameters
+    optimizer2 = torch.optim.Adam(m2.parameters(), lr=0.1)
+
+    # "Loss" for GPs - the marginal log likelihood
+    mll2 = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood2, m2)
+
+    for i in range(training_iter):
+        # Zero gradients from previous iteration
+        optimizer2.zero_grad()
+        # Output from model
+        output2 = m2(XX)
+        # Calc loss and backprop gradients
+        loss = -mll2(output2, train_y_hf)
+        loss.backward()
+        if i % 10 == 0:
+            print('Iter %d/%d - Loss: %.3f' % (  # '  noise: %.3f # lengthscale: %.3f   % (
+                i + 1, training_iter, loss.item(),))
+            # model.covar_module.base_kernel.lengthscale.item(),
+            # m2.likelihood.noise.item()))
+        optimizer2.step()
+    return m2, likelihood2
+
+
+def evaluate_second_lvl(m1, likelihood1, m2, likelihood2, xval, nsamples=1000):
+
+    # Get into evaluation (predictive posterior) mode
+    m2.eval()
+    likelihood2.eval()
+
+    # Predict at validation points
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+
+        ntest = xval.shape[0]
+        trained_pred_dist0 = likelihood1(m1(torch.Tensor(xval)))
+        mu0 = trained_pred_dist0.mean
+        v0 = trained_pred_dist0.variance
+        C0 = trained_pred_dist0.covariance_matrix
+
+        Z = np.random.multivariate_normal(mu0.flatten(), C0, nsamples)
+        tmp_m = np.zeros((nsamples, ntest))
+        tmp_v = np.zeros((nsamples, ntest))
+
+        # Push samples through f_2
+        for i in range(0, nsamples):
+            XXX = torch.Tensor(
+                np.hstack([xval, np.array(Z)[i, :][:, None]]))
+            trained_pred_dist2 = likelihood2(m2(XXX))
+            mu2 = trained_pred_dist2.mean
+            v2 = trained_pred_dist2.variance
+            tmp_m[i, :] = mu2.flatten()
+            tmp_v[i, :] = v2.flatten()
+
+        # get mean and variance at X3
+        mu3 = np.mean(tmp_m, axis=0)
+        v3 = np.mean(tmp_v, axis=0) + np.var(tmp_m, axis=0)
+        v3 = np.abs(v3[:, None])
+
+    return mu0, v0, mu3, v3
+
+
+# Load data
+minyear = 2000
+maxyear = 2005
+
+all_station_dict = pd.read_csv(data_dir + 'bs_gauges/gauge_info.csv', index_col='station')
+cv_locs = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp3/cv_locs.npy')
+cv_locs = cv_locs.reshape(-1, 2)
+
+station_list = []
+for loc in cv_locs:
+    station_row = all_station_dict[(all_station_dict['lat'] == loc[1]) | (all_station_dict['lon'] == loc[0])]
+    station_list.append(str(np.array(station_row.index[0])))
+
+station_arr = np.array(station_list)
+
+# Split into five chunks
+kf = KFold(n_splits=5)
+
+cv_train_list = []
+cv_test_list = []
+
+for train_index, test_index in kf.split(station_arr):
+    hf_train, hf_test = station_arr[train_index], station_arr[test_index]
+    cv_train_list.append(hf_train)
+    cv_test_list.append(hf_test)
+
+R2_all = []
+RMSE_all = []
+RMSE_p5 = []
+RMSE_p95 = []
+MSLL = []
+
+for i in range(len(cv_train_list)):
+
+    hf_train_list = []
+    for station in cv_train_list[i]:
+        station_ds = beas_sutlej_gauges.gauge_download(
+            station, minyear=minyear, maxyear=maxyear)
+        hf_train_list.append(station_ds.to_dataframe().dropna().reset_index())
+    hf_train_df = pd.concat(hf_train_list)
+
+    val_list = []
+    for station in cv_test_list[i]:
+        station_ds = beas_sutlej_gauges.gauge_download(
+            station, minyear=minyear, maxyear=maxyear)
+        val_list.append(station_ds.to_dataframe().dropna().reset_index())
+    val_df = pd.concat(val_list)
+
+    # era5.collect_ERA5('indus', minyear=minyear, maxyear=maxyear)
+    era5_df = era5.gauges_download(
+        list(cv_test_list[i]) + list(cv_train_list[i]), minyear=minyear, maxyear=maxyear)
+
+    lf_train_df = era5_df  # s.to_dataframe().dropna().reset_index()
+    # lf_df1 = lf_df[lf_df['lat'] <= 33]
+    # lf_df2 = lf_df1[lf_df1['lat'] >= 30]
+    # lf_df3 = lf_df2[lf_df2['lon'] >= 76]
+    # lf_train_df = lf_df3[lf_df3['lon'] <= 80]
+
+    # Prepare data
+
+    # Transformations
+    lf_train_df['tp_tr'], lf_lambda = sp.stats.boxcox(
+        lf_train_df['tp'].values + 0.01)
+    hf_train_df['tp_tr'] = sp.stats.boxcox(
+        hf_train_df['tp'].values + 0.01, lmbda=lf_lambda)
+    val_df['tp_tr'] = sp.stats.boxcox(
+        val_df['tp'].values + 0.01, lmbda=lf_lambda)
+
+    # Splitting
+    x_train_lf = lf_train_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
+    y_train_lf = lf_train_df['tp_tr'].values.reshape(-1, 1)
+    x_train_hf = hf_train_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
+    y_train_hf = hf_train_df[['tp_tr']].values.reshape(-1, 1)
+    x_val = val_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
+    y_val = val_df['tp_tr'].values.reshape(-1, 1)
+
+    # Scaling
+    scaler = MinMaxScaler().fit(x_train_hf)
+    x_train_hf1 = scaler.transform(x_train_hf)
+    x_train_lf1 = scaler.transform(x_train_lf)
+    x_val1 = scaler.transform(x_val)
+
+    # Make tensors
+    train_x_lf, train_y_lf = torch.Tensor(
+        x_train_lf1), torch.Tensor(y_train_lf.reshape(-1))
+    train_x_hf, train_y_hf = torch.Tensor(
+        x_train_hf1), torch.Tensor(y_train_hf.reshape(-1))
+
+    # Train and evaluate model
+
+    # for l in lengthscales:
+    # lengthscale_prior = gpytorch.priors.NormalPrior(0, l)
+    # , lengthscale_prior=lengthscale_prior)
+    base_kernel = gpytorch.kernels.MaternKernel(
+        ard_num_dims=4, active_dims=[0, 1, 2, 3])
+
+    m1, likelihood1 = train_first_lvl(
+        train_x_lf, train_y_lf, 200)
+    mu1, v1 = evaluate_first_lvl(m1, likelihood1, train_x_hf)
+    m2, likelihood2 = train_second_lvl(
+        train_x_hf, train_y_hf, mu1, 2000, base_kernel)
+
+    """
+    mu0, v0, mu2, v2 = evaluate_second_lvl(
+        m1, likelihood1, m2, likelihood2, x_val1, nsamples=100)
+    mu0_, v0_, mu2_, v2_ = evaluate_second_lvl(
+        m1, likelihood1, m2, likelihood2, x_train_hf1, nsamples=100)
+
+
+    plt.figure()
+    plt.scatter(x_val1[:10, 0], y_val[:10])
+    plt.scatter(x_val1[:10, 0], mu2[:10])
+    plt.savefig('gpytorch_mfdgp_lf_output_' + str(minyear) +
+                '-' + str(maxyear) + '_val.png')
+
+    plt.figure()
+    plt.scatter(x_val1[:10, 0], y_train_hf[:10])
+    plt.scatter(x_val1[:10, 0], mu2_[:10])
+    plt.savefig('gpytorch_mfdgp_output_' +
+                str(minyear) + '-' + str(maxyear) + '_train.png')
+
+
+    y_pred = sp.special.inv_boxcox(mu2, lf_lambda).reshape(-1)
+    y_true = sp.special.inv_boxcox(y_val, lf_lambda).reshape(-1)
+    R2_all.append(r2_score(y_true, y_pred))
+    RMSE_all.append(mean_squared_error(y_true, y_pred, squared=False))
+
+    # 5th PERCENTILE
+    p5 = np.percentile(y_true, 5.0)
+    indx = [y_true <= p5][0]
+    x_val_p5 = x_val[indx, :]
+    y_true_p5 = y_true[indx]
+    y_pred_p5 = y_pred[indx]
+    RMSE_p5.append(mean_squared_error(y_true_p5, y_pred_p5, squared=False))
+
+    # 95th PERCENTILE
+    p95 = np.percentile(y_true, 95.0)
+    indx = [y_true >= p95][0]
+    x_val_p95 = x_val[indx]
+    y_true_p95 = y_true[indx]
+    y_pred_p95 = y_pred[indx]
+    RMSE_p95.append(mean_squared_error(y_true_p95, y_pred_p95, squared=False))
+
+    np.savetxt('R2_all.csv', R2_all)
+    np.savetxt('RMSE_p95.csv', RMSE_p95)
+    np.savetxt('RMSE_p5.csv', RMSE_p5)
+    np.savetxt('RMSE_all.csv', RMSE_all)
+    """
+
+
+    def plot(m1, likelihood1,  m2, likelihood2):
+
+        # Validation
+        x_plot = np.linspace(0, 1, 1200).reshape(-1, 1)
+        newrow = x_val1[0, 1:4]
+        newrow_repeat = np.repeat(newrow[np.newaxis, :], 1200, axis=0)
+        x_eval2 = np.concatenate([x_plot, newrow_repeat], axis=1)
+
+        # Training
+        newrow1 = x_train_hf1[0, 1:4]
+        newrow_repeat1 = np.repeat(newrow1[np.newaxis, :], 1200, axis=0)
+        x_eval1 = np.concatenate([x_plot, newrow_repeat1], axis=1)
+        # x_eval2 = np.concatenate([x_eval, x_eval1], axis=0)
+
+        mu0, v0, mu1, v1 = evaluate_second_lvl(
+            m1, likelihood1, m2, likelihood2, torch.Tensor(x_eval1[:120]), nsamples=100)
+        _, _, mu2, v2 = evaluate_second_lvl(
+            m1, likelihood1, m2, likelihood2, torch.Tensor(x_eval2[:120]), nsamples=100)
+
+        std1 = np.sqrt(v1).flatten()
+        std2 = np.sqrt(v2).flatten()
+
+        plt.figure()
+        plt.plot(x_plot[:120, 0], mu1[:120], label='Training output')
+        plt.fill_between(x_plot[:120, 0], mu1[:120] - 1.96 * std1[:120], mu1[:120] + 1.96 * std1[:120], alpha=0.3)
+        plt.scatter(x_train_hf1[:12, 0], y_train_hf[:12],
+                    label='Gauge training pts')
+        plt.scatter(x_train_lf1[:12, 0], y_train_lf[:12],
+                    label='Era5 validation pts')
+        plt.plot(x_plot[:120, 0], mu2[:120], c='r', label='Validation ouptut')
+        plt.fill_between(x_plot[:120, 0], mu2[:120]-1.96*std2[:120],
+                        mu2[:120]+1.96*std2[:120], color='r', alpha=0.1)
+        plt.legend()
+        plt.savefig('gp2_output_2000-2001_4.png')
+
+
+    plot(m1, likelihood1, m2, likelihood2)
+
+
+    # ALL
+    mu0, v0, mu2, v2 = evaluate_second_lvl(
+        m1, likelihood1, m2, likelihood2, torch.Tensor(x_val1), nsamples=100)
+    y_pred = sp.special.inv_boxcox(np.array(mu2), lf_lambda).reshape(-1)
+    y_true = sp.special.inv_boxcox(y_val, lf_lambda).reshape(-1)
+    R2_all.append(r2_score(y_true, y_pred))
+    RMSE_all.append(mean_squared_error(y_true, y_pred, squared=False))
+
+    # 5th PERCENTILE
+    p5 = np.percentile(y_true, 5.0)
+    indx = [y_true <= p5][0]
+    x_val_p5 = x_val[indx, :]
+    y_true_p5 = y_true[indx]
+    y_pred_p5 = y_pred[indx]
+    RMSE_p5.append(mean_squared_error(y_true_p5, y_pred_p5, squared=False))
+
+    # 95th PERCENTILE
+    p95 = np.percentile(y_true, 95.0)
+    indx = [y_true >= p95][0]
+    x_val_p95 = x_val[indx]
+    y_true_p95 = y_true[indx]
+    y_pred_p95 = y_pred[indx]
+    RMSE_p95.append(mean_squared_error(y_true_p95, y_pred_p95, squared=False))
+
+    # MSLL
+    ll = msll(y_val, mu2, v2)
+    MSLL.append(ll)
+
+print('Mean RMSE = ', np.mean(RMSE_all), '±', np.std(RMSE_all))
+print('Mean R2 = ', np.mean(R2_all), '±', np.std(R2_all))
+print('5th RMSE = ', np.mean(RMSE_p5), '±', np.std(RMSE_p5))
+print('95th RMSE = ', np.mean(RMSE_p95), '±', np.std(RMSE_p95))
+print('MSLL= ', np.mean(MSLL), '±', np.std(MSLL))
