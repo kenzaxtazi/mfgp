@@ -2,7 +2,7 @@ import sys
 sys.path.append('/data/hpcdata/users/kenzi22/')
 
 from load import beas_sutlej_gauges, era5, data_dir
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from matplotlib import pyplot as plt
 import gpytorch
 import torch
@@ -273,7 +273,7 @@ for i in range(len(cv_train_list)):
     y_val = val_df['tp_tr'].values.reshape(-1, 1)
 
     # Scaling
-    scaler = MinMaxScaler().fit(x_train_hf)
+    scaler = StandardScaler().fit(x_train_hf)
     x_train_hf1 = scaler.transform(x_train_hf)
     x_train_lf1 = scaler.transform(x_train_lf)
     x_val1 = scaler.transform(x_val)
