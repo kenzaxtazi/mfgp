@@ -1,5 +1,7 @@
-*.ipynb
 *.e
 *.o
 *-checkpoint.py
 __pycache__/models.cpython-37.pyc
+archive/*
+images/*
+*checkpoint.ipynb
