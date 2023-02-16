@@ -1,5 +1,6 @@
 import scipy as sp
 import numpy as np
+import pandas as pd
 from sklearn.metrics import r2_score, mean_squared_error
 
 
@@ -23,14 +24,13 @@ def rmses(y_pred, y_true):
     return rmse_all, rmse_p5, rmse_p95
 
 
-def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, lmbda: float):
+def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, y_val: np.array, save=False):
     """ 
     Calculate R2 values for different locations in validation set.
 
     mu0 : mean posterior distribution for low fidelity
     mu2 : mean posterior distribution for high fidelity
     x_val1 : normalised x values
-    lmbda : target variable scaling factor
     """
 
     val_df1 = pd.DataFrame(x_val1, columns=['time', 'lon', 'lat', 'z'])
@@ -45,17 +45,20 @@ def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, lmbda: float)
     for df in val_df1s:
         x_val = df[['time', 'lon', 'lat', 'z']].values.reshape(-1, 4)
         y_val = df['tp_tr'].values.reshape(-1)
-        y_pred0_lf = df['mu0'].values.reshape(-1)
-        y_pred0_hf = df['mu2'].values.reshape(-1)
-        # ALL
-        y_pred_lf = sp.special.inv_boxcox(y_pred0_lf, lmbda).reshape(-1)
-        y_pred_hf = sp.special.inv_boxcox(y_pred0_hf, lmbda).reshape(-1)
+        y_pred_lf = df['mu0'].values.reshape(-1)
+        y_pred_hf = df['mu2'].values.reshape(-1)
+       
         y_true = sp.special.inv_boxcox(y_val, lmbda).reshape(-1)
         R2_hf.append(r2_score(y_true, y_pred_hf))
         R2_lf.append(r2_score(y_true, y_pred_lf))
-
-    np.savetxt('table3_ypred_lf_r2_2000-2010.csv', R2_lf)
-    np.savetxt('table3_ypred_hf_r2_2000-2010.csv', R2_hf)
+        
+    if save == True:
+        np.savetxt('table3_ypred_lf_r2_2000-2010.csv', R2_lf)
+        np.savetxt('table3_ypred_hf_r2_2000-2010.csv', R2_hf)
+        
+    print(R2_hf, R2_lf)
+    
+    return R2_hf,  R2_lf
 
 
 def msll(y_true, y_pred, v_pred) -> int:
