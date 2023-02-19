@@ -24,7 +24,7 @@ def rmses(y_pred, y_true):
     return rmse_all, rmse_p5, rmse_p95
 
 
-def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, y_val: np.array, save=False):
+def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, y_true: np.array, save=False):
     """ 
     Calculate R2 values for different locations in validation set.
 
@@ -36,7 +36,7 @@ def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, y_val: np.arr
     val_df1 = pd.DataFrame(x_val1, columns=['time', 'lon', 'lat', 'z'])
     val_df1['mu2'] = mu2
     val_df1['mu0'] = mu0
-    val_df1['tp_tr'] = y_val
+    val_df1['tp'] = y_true
     val_df1s = [x for _, x in val_df1.groupby(['lon', 'lat', 'z'])]
 
     R2_hf = []
@@ -44,11 +44,10 @@ def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, y_val: np.arr
 
     for df in val_df1s:
         x_val = df[['time', 'lon', 'lat', 'z']].values.reshape(-1, 4)
-        y_val = df['tp_tr'].values.reshape(-1)
+        y_true = df['tp'].values.reshape(-1)
         y_pred_lf = df['mu0'].values.reshape(-1)
         y_pred_hf = df['mu2'].values.reshape(-1)
        
-        y_true = sp.special.inv_boxcox(y_val, lmbda).reshape(-1)
         R2_hf.append(r2_score(y_true, y_pred_hf))
         R2_lf.append(r2_score(y_true, y_pred_lf))
         
