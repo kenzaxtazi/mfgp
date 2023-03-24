@@ -6,3 +6,10 @@ archive/*
 images/*
 *.ipynb_checkpoints
 *__pycache__
+*data/*
+*outputs/*
+*.png
+*.csv
+*.npy
+*.DS_store
+*.pkl
