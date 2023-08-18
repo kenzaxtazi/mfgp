@@ -13,4 +13,4 @@ images/*
 *.npy
 *.DS_store
 *.pkl
-*.gitignore
+.gitignore
