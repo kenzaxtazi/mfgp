@@ -56,15 +56,45 @@ def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, y_true: np.ar
         np.savetxt('table3_ypred_hf_r2_2000-2010.csv', R2_hf)
 
     print(R2_hf, R2_lf)
-
     return R2_hf,  R2_lf
 
 
-def mll(y_true, y_pred, v_pred) -> int:
+def msll(y_true: np.array, y_pred: np.array, v_pred: np.array) -> int:
+    """
+    Calculate the Mean Standardised Log Loss (MLL).
+
+    Args:
+        y_true (np.array): observations
+        y_pred (np.array): predicted mean
+        v_pred (np.array): predicted variance
+
+    Returns:
+        int: MSLL metric
+    """
     # set everything to numpy arrays
     y_true, y_pred, v_pred = np.array(
         y_true), np.array(y_pred), np.array(v_pred)
-    std_pred = np.sqrt(v_pred)
-    first_term = 0.5 * np.log(2 * np.pi * std_pred**2)
-    second_term = ((y_true - y_pred)**2)/(2 * std_pred**2)
+    first_term = 0.5 * np.log(2 * np.pi * v_pred)
+    second_term = ((y_true - y_pred)**2)/(2 * v_pred)
     return np.mean(first_term + second_term)
+
+
+def nlpd(y_true: np.array, y_pred: np.array, v_pred: np.array) -> int:
+    """
+    Calculate the Negative Log Predictive Density (NLPD).
+
+    Args:
+        y_true (np.array): observations
+        y_pred (np.array): predicted mean
+        v_pred (np.array): predicted variance
+
+    Returns:
+        int: NLPD metric
+    """
+    # set everything to numpy arrays
+    y_true, y_pred, v_pred = np.array(
+        y_true), np.array(y_pred), np.array(v_pred)
+    data_probs = sp.stats.multivariate_normal(
+        x=y_true, mean=y_pred, cov=v_pred)
+    nlpd = -np.mean(data_probs)
+    return nlpd
