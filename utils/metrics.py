@@ -4,7 +4,18 @@ import pandas as pd
 from sklearn.metrics import r2_score, mean_squared_error
 
 
-def rmses(y_pred, y_true):
+def rmses(y_pred: np.array, y_true: np.array) -> tuple:
+    """
+    Calculate RMSE for all data, 5th percentile and 95th percentile.
+
+    Args:
+        y_pred (np.array): _description_
+        y_true (np.array): _description_
+
+    Returns:
+        tuple: mse_all, rmse_p5, rmse_p95
+    """
+
     rmse_all = mean_squared_error(y_true, y_pred, squared=False)
 
     # 5th PERCENTILE
