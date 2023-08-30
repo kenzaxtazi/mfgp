@@ -70,7 +70,7 @@ def r2_low_vs_high(mu0: np.array, mu2: np.array, x_val1: np.array, y_true: np.ar
     return R2_hf,  R2_lf
 
 
-def msll(y_true: np.array, y_pred: np.array, v_pred: np.array) -> int:
+def mll(y_true: np.array, y_pred: np.array, v_pred: np.array) -> int:
     """
     Calculate the Mean Standardised Log Loss (MLL).
 
