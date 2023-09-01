@@ -6,23 +6,28 @@ import gpytorch
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from load import beas_sutlej_gauges
-from utils.metrics import rmses, msll
+from utils.metrics import rmses, mll
 from sklearn.metrics import r2_score
 import sys
 sys.path.append('/data/hpcdata/users/kenzi22/')
 
 
 class GPRegressionModel(gpytorch.models.ExactGP):
-    """ GPyTorch GP regression class"""
+    """ Define GP model """
 
-    def __init__(self, train_x, train_y, likelihood):
+    def __init__(self, train_x, train_y, likelihood, custom=False):
         super(GPRegressionModel, self).__init__(train_x, train_y, likelihood)
 
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.PeriodicKernel(active_dims=[0]) *
-            gpytorch.kernels.RBFKernel(active_dims=[0]) +
-            gpytorch.kernels.RBFKernel(ard_num_dims=4))
+        if custom == False:
+            self.covar_module = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=4, active_dims=[0, 1, 2, 3]))
+        if custom == True:
+            self.covar_module = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.MaternKernel(
+                    nu=2.5, ard_num_dims=3, active_dims=[1, 2, 3])
+                + gpytorch.kernels.PeriodicKernel(active_dims=[0])
+                * gpytorch.kernels.MaternKernel(nu=2.5, active_dims=[0]))
 
     def forward(self, x):
         mean_x = self.mean_module(x)
