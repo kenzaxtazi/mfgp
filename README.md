@@ -1,3 +1,3 @@
-# mfdgp
+# mfgp
 
-Multi-Fidelity Deep Gaussian Processes (MFDGP) applied to downscaling sparse climatic data.
+Multi-Fidelity Gaussian Processes (MFDGP) applied to downscaling sparse climatic data.
