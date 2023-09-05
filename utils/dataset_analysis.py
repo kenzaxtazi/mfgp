@@ -7,6 +7,7 @@ import gpytorch
 import numpy as np
 import pandas as pd
 import scipy as sp
+import xarray as xr
 
 from sklearn.metrics import mean_squared_error, r2_score
 from tqdm import tqdm
@@ -294,8 +295,18 @@ def europe_vs_bs_precip_stats(minyear: str, maxyear: str):
     print('95th percentile = ', np.percentile(bs_tp, 95), 'mm/day')
 
 
-def europe_vs_bs_precip_lengthscales(minyear: str, maxyear: str):
+def europe_vs_bs_precip_lengthscales(minyear: str, maxyear: str) -> list:
+    """
+    Caluclate the lengthscales for the latitude and longitude for
+    the VALUE gauge data and the Beas and Sutlej gauge data.
 
+    Args:
+        minyear (str): maximum year to analyse (inclusive)
+        maxyear (str): mininum year to analyse (inclusive)
+
+    Returns:
+        list: list of lengthscales for VALUE and BS datasets
+    """
     value_gauge_df = value.all_gauge_data(minyear, maxyear, monthly=True)
     value_gauge_df['time'] = pd.to_datetime(value_gauge_df['time'])
     value_gauge_df['time'] = pd.to_numeric(
@@ -373,3 +384,25 @@ def europe_vs_bs_precip_lengthscales(minyear: str, maxyear: str):
         lengthscale_list.append(lengthscales)
 
     return lengthscale_list
+
+
+def median_beas_sutlej_elev():
+    """ Returns median elevation of the Beas and Sutlej basins """
+
+    # Topography data
+    top_ds = xr.open_dataset(
+        data_dir + 'Elevation/GMTED2010_15n015_00625deg.nc')
+    top_ds = top_ds.assign_coords(
+        {'nlat': top_ds.latitude, 'nlon': top_ds.longitude})
+
+    # Basin masks
+    mask_filepath = data_dir + 'Masks/Beas_Sutlej_mask.nc'
+    mask = xr.open_dataset(mask_filepath)
+    mask = mask.rename({'latitude': 'nlat', 'longitude': 'nlon'})
+    elv_da = top_ds.elevation.interp_like(mask)
+    mask_da = mask.overlap
+    masked_da = elv_da.where(mask_da > 0, drop=True)
+
+    median_elev = masked_da.median(skipna=True).values
+    print('Median elevation: ', median_elev, 'm')
+    return median_elev
