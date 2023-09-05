@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 import GPy
+import os
 import scipy as sp
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
@@ -25,7 +26,7 @@ from emukit.multi_fidelity.convert_lists_to_array import convert_x_list_to_array
 minyear =  os.environ["minyear"]
 maxyear =  os.environ["maxyear"]
 
-all_station_dict = pd.read_csv( data_dir + 'bs_gauges/gauge_info.csv', index_col='station').T
+all_station_dict = pd.read_csv(data_dir + 'bs_gauges/gauge_info.csv', index_col='station').T
 station_list = list(all_station_dict)
 
 hf_train_list = []
@@ -87,15 +88,16 @@ x_val1 = scaler.transform(x_val)
 X_train, Y_train = convert_xy_lists_to_arrays([x_train_lf1[:], x_train_hf1[:]], [y_train_lf[:], y_train_hf[:]])
 
 # Train and evaluate
-kern1 = GPy.kern.RBF(input_dim=4, ARD=True)
-kern2 = GPy.kern.RBF(input_dim=2, ARD=True)
+kern1 = GPy.kern.Matern52(input_dim=4, ARD=True)
+kern2 = GPy.kern.Matern52(input_dim=4, ARD=True)
 kernels = [kern1, kern2]
 lin_mf_kernel = emukit.multi_fidelity.kernels.LinearMultiFidelityKernel(kernels)
 gpy_lin_mf_model = GPyLinearMultiFidelityModel(X_train, Y_train, lin_mf_kernel, n_fidelities=2,)
 gpy_lin_mf_model.mixed_noise.Gaussian_noise.fix(0)
 gpy_lin_mf_model.mixed_noise.Gaussian_noise_1.fix(0)
-gpy_lin_mf_model.multifidelity.rbf_1.lengthscale[[2]].set_prior(GPy.priors.Gaussian(0.6, 0.5)) #constrain_bounded(0.5,1)
-gpy_lin_mf_model.multifidelity.rbf.lengthscale[[2]].set_prior(GPy.priors.Gaussian(0.6, 0.5)) #constrain_bounded(0.5,1)
+gpy_lin_mf_model.unconstrain()
+gpy_lin_mf_model.multifidelity.Mat52_1.lengthscale[[1]].set_prior(GPy.priors.Gaussian(0.6, 0.5)) #constrain_bounded(0.5,1)
+gpy_lin_mf_model.multifidelity.Mat52_1.lengthscale[[2]].set_prior(GPy.priors.Gaussian(0.6, 0.5)) #constrain_bounded(0.5,1)
 lin_mf_model = GPyMultiOutputWrapper(gpy_lin_mf_model, 2, n_optimization_restarts=5)
 lin_mf_model.optimize()
 
@@ -113,7 +115,7 @@ hr_data_df['y_var0'] = y_var0
 hr_data_df['y_var_low0'] = y_var_low0
 
 filename = 'preds_' + str(minyear) + '_' + str(maxyear) + '.csv' 
-hr_data_df['pred_low0','pred0'].to_csv(filename)
+hr_data_df.to_csv(filename)
 
 #hr_data_df.plot.scatter(x='lon', y='lat', c='pred0', figsize=(10,5))
 #plt.savefig('high_example_no_noise.png')
