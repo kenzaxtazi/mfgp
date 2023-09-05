@@ -1,15 +1,19 @@
+import sys
+import torch
+import gpytorch
+
 import scipy as sp
 import numpy as np
 import pandas as pd
-import torch
-import gpytorch
+
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
-from load import beas_sutlej_gauges
-from utils.metrics import rmses, mll
+
+# custom libraries
+from utils import metrics
 from sklearn.metrics import r2_score
-import sys
-sys.path.append('/data/hpcdata/users/kenzi22/')
+sys.path.append('/Users/kenzatazi/Documents/CDT/Code')  # noqa
+from load import beas_sutlej_gauges  # noqa
 
 
 class GPRegressionModel(gpytorch.models.ExactGP):
@@ -151,8 +155,8 @@ if __name__ in "__main__":
     y_pred = sp.special.inv_boxcox(np.array(y_pred0), lmbda).reshape(-1)
     y_true = sp.special.inv_boxcox(y_val, lmbda).reshape(-1)
     r2 = r2_score(y_true, y_pred)
-    rmse_all, rmse_p5, rmse_p95 = rmses(y_pred, y_true)
-    log_loss = msll(y_val, y_pred0, y_std0)
+    rmse_all, rmse_p5, rmse_p95 = metrics.rmses(y_pred, y_true)
+    log_loss = metrics.mll(y_val, y_pred0, y_std0)
 
     print('Mean R2 = ', r2)
     print('Mean RMSE = ', rmse_all)
