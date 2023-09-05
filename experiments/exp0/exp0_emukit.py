@@ -1,37 +1,37 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-## Experiment 0
+# Experiment 0
 
-import sys
-sys.path.append('/data/hpcdata/users/kenzi22')
 
-from load import era5, data_dir, value
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from matplotlib import pyplot as plt
-import pandas as pd
-import numpy as np
-import GPy
-from tqdm import tqdm
-import scipy as sp
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import KFold
-from mfdgp.utils.metrics import msll, r2_low_vs_high, nlpd
+import sys  # noqa
+sys.path.append('/data/hpcdata/users/kenzi22')  # noqa
 
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
 
-import emukit
-from emukit.model_wrappers.gpy_model_wrappers import GPyMultiOutputWrapper
-from emukit.multi_fidelity.models import GPyLinearMultiFidelityModel
 from emukit.multi_fidelity.convert_lists_to_array import convert_x_list_to_array, convert_xy_lists_to_arrays
+from emukit.multi_fidelity.models import GPyLinearMultiFidelityModel
+from emukit.model_wrappers.gpy_model_wrappers import GPyMultiOutputWrapper
+import emukit
+from sklearn.linear_model import LinearRegression
+from utils import metrics
+from sklearn.model_selection import KFold
+from sklearn.metrics import mean_squared_error, r2_score
+import scipy as sp
+from tqdm import tqdm
+import GPy
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from load import era5, data_dir, value
 
 
-### Prepare data
+# Prepare data
 
 # Load data
 minyear = 2000
 maxyear = 2005
+
 '''
 gauge_df = value.all_gauge_data(minyear, maxyear, monthly=True)
 station_names = gauge_df.drop_duplicates('name')['name']
@@ -133,16 +133,20 @@ np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/lf_lambda_2000-
 '''
 cv_dir = '/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/'
 
-cv_x_train_hf = np.load(cv_dir + 'cv_x_train_hf_value_2000-2005.npy', allow_pickle=True)
-cv_y_train_hf = np.load(cv_dir + 'cv_y_train_hf_value_2000-2005.npy', allow_pickle=True)
-cv_x_train_lf = np.load(cv_dir + 'cv_x_train_lf_value_2000-2005.npy', allow_pickle=True)
-cv_y_train_lf = np.load(cv_dir + 'cv_y_train_lf_value_2000-2005.npy', allow_pickle=True)
+cv_x_train_hf = np.load(
+    cv_dir + 'cv_x_train_hf_value_2000-2005.npy', allow_pickle=True)
+cv_y_train_hf = np.load(
+    cv_dir + 'cv_y_train_hf_value_2000-2005.npy', allow_pickle=True)
+cv_x_train_lf = np.load(
+    cv_dir + 'cv_x_train_lf_value_2000-2005.npy', allow_pickle=True)
+cv_y_train_lf = np.load(
+    cv_dir + 'cv_y_train_lf_value_2000-2005.npy', allow_pickle=True)
 cv_x_val = np.load(cv_dir + 'cv_x_val_value_2000-2005.npy', allow_pickle=True)
 cv_y_val = np.load(cv_dir + 'cv_y_val_value_2000-2005.npy', allow_pickle=True)
 lf_lambdas = np.load(cv_dir + 'lf_lambda_2000-2005.npy', allow_pickle=True)
 
 
-### MFDGP
+# MFDGP
 
 R2_all = []
 RMSE_all = []
@@ -161,32 +165,36 @@ MSLL_low = []
 for i in range(len(cv_x_train_hf)):
 
     # Input data
-    X_train, Y_train = convert_xy_lists_to_arrays([cv_x_train_lf[i], cv_x_train_hf[i]], [cv_y_train_lf[i], cv_y_train_hf[i]])
-    
+    X_train, Y_train = convert_xy_lists_to_arrays(
+        [cv_x_train_lf[i], cv_x_train_hf[i]], [cv_y_train_lf[i], cv_y_train_hf[i]])
+
     # Train and evaluate
     kern1 = GPy.kern.Matern52(input_dim=4, ARD=True)
     kernels = [kern1, GPy.kern.Matern52(input_dim=4, ARD=True)]
-    lin_mf_kernel = emukit.multi_fidelity.kernels.LinearMultiFidelityKernel(kernels)
-    gpy_lin_mf_model = GPyLinearMultiFidelityModel(X_train, Y_train, lin_mf_kernel, n_fidelities=2,)
+    lin_mf_kernel = emukit.multi_fidelity.kernels.LinearMultiFidelityKernel(
+        kernels)
+    gpy_lin_mf_model = GPyLinearMultiFidelityModel(
+        X_train, Y_train, lin_mf_kernel, n_fidelities=2,)
     gpy_lin_mf_model.mixed_noise.Gaussian_noise.fix(0)
     gpy_lin_mf_model.mixed_noise.Gaussian_noise_1.fix(0)
-    lin_mf_model = GPyMultiOutputWrapper(gpy_lin_mf_model, 2, n_optimization_restarts=5)
+    lin_mf_model = GPyMultiOutputWrapper(
+        gpy_lin_mf_model, 2, n_optimization_restarts=5)
     lin_mf_model.optimize()
     print(gpy_lin_mf_model.multifidelity.Mat52_1.lengthscale)
 
-    # Load and prep test data                                     
-    x_val1, y_val = cv_x_val[i], cv_y_val[i]                                                                                   
+    # Load and prep test data
+    x_val1, y_val = cv_x_val[i], cv_y_val[i]
     n = x_val1.shape[0]
     x_met = convert_x_list_to_array([x_val1, x_val1])
     y_pred0, y_var0 = lin_mf_model.predict(x_met[n:])
     y_pred_low0, y_var_low0 = lin_mf_model.predict(x_met[:n])
-    
+
     # ALL
     y_pred = sp.special.inv_boxcox(y_pred0, lf_lambdas[i]).reshape(-1)
     y_true = sp.special.inv_boxcox(y_val, lf_lambdas[i]).reshape(-1)
     R2_all.append(r2_score(y_true, y_pred))
     RMSE_all.append(mean_squared_error(y_true, y_pred, squared=False))
-    
+
     y_pred_low = sp.special.inv_boxcox(y_pred_low0, lf_lambdas[i]).reshape(-1)
     R2_all_low.append(r2_score(y_true, y_pred_low))
     RMSE_all_low.append(mean_squared_error(y_true, y_pred_low, squared=False))
@@ -199,7 +207,8 @@ for i in range(len(cv_x_train_hf)):
     y_pred_p5 = y_pred[indx]
     y_pred_p5_low = y_pred_low[indx]
     RMSE_p5.append(mean_squared_error(y_true_p5, y_pred_p5, squared=False))
-    RMSE_p5_low.append(mean_squared_error(y_true_p5, y_pred_p5_low, squared=False))
+    RMSE_p5_low.append(mean_squared_error(
+        y_true_p5, y_pred_p5_low, squared=False))
 
     # 95th PERCENTILE
     p95 = np.percentile(y_true, 95.0)
@@ -209,16 +218,14 @@ for i in range(len(cv_x_train_hf)):
     y_pred_p95 = y_pred[indx]
     y_pred_p95_low = y_pred_low[indx]
     RMSE_p95.append(mean_squared_error(y_true_p95, y_pred_p95, squared=False))
-    RMSE_p95_low.append(mean_squared_error(y_true_p95, y_pred_p95_low, squared=False))
-                        
+    RMSE_p95_low.append(mean_squared_error(
+        y_true_p95, y_pred_p95_low, squared=False))
+
     # MSLL
-    ll = msll(y_val, y_pred0, y_var0)
-    ll_low = msll(y_val, y_pred_low0, y_var_low0)
+    ll = metrics.mll(y_val, y_pred0, y_var0)
+    ll_low = metrics.mll(y_val, y_pred_low0, y_var_low0)
     MSLL.append(ll)
     MSLL_low.append(ll_low)
-
-    nlpd_values = nlpd(y_val, y_pred0, y_var0)
-    NLPD.append(nlpd_values)
 
 # Print metrics
 
@@ -228,7 +235,7 @@ print('5th RMSE = ', np.mean(RMSE_p5), '±', np.std(RMSE_p5))
 print('95th RMSE = ', np.mean(RMSE_p95), '±', np.std(RMSE_p95))
 print('MSLL= ', np.mean(MSLL), '±', np.std(MSLL))
 print('NLPD= ', np.mean(NLPD), '±', np.std(NLPD))
-                        
+
 print('Mean RMSE = ', np.mean(RMSE_all_low), '±', np.std(RMSE_all_low))
 print('Mean R2 = ', np.mean(R2_all_low), '±', np.std(R2_all_low))
 print('5th RMSE = ', np.mean(RMSE_p5_low), '±', np.std(RMSE_p5_low))
