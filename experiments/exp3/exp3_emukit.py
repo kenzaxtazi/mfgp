@@ -47,15 +47,15 @@ lf_df2 = lf_df1[lf_df1['lat'] >= 30.25]
 lf_df3 = lf_df2[lf_df2['lon'] >= 75.75]
 lf_train_df = lf_df3[lf_df3['lon'] <= 82.5]
 
-# Import SRTM data
-srtm_ds = xr.open_dataset(data_dir + '/Elevation/SRTM_data.nc')
-srtm_ds = srtm_ds.rename({'nlat': 'lat', 'nlon': 'lon'})
+# Import GMTED2010 data
+gmted_ds = xr.open_dataset(data_dir + '/Elevation/GMTED2010_data.nc')
+gmted_ds = gmted_ds.rename({'nlat': 'lat', 'nlon': 'lon'})
 
 # Mask to beas and sutlej
 mask_filepath = data_dir + '/Masks/Beas_Sutlej_highres_mask.nc'
 mask = xr.open_dataset(mask_filepath)
 mask_da = mask.Overlap
-msk_hr_data_ds = srtm_ds.where(mask_da > 0, drop=True)
+msk_hr_data_ds = gmted_ds.where(mask_da > 0, drop=True)
 
 times = era5_df.reset_index()['time'].drop_duplicates()
 msk_hr_data_ds = msk_hr_data_ds.assign_coords(time=times.values)
