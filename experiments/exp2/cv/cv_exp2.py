@@ -1,3 +1,4 @@
+from load import beas_sutlej_gauges, era5, data_dir
 import sys
 import pandas as pd
 from sklearn.cluster import KMeans
@@ -6,24 +7,24 @@ import matplotlib.pyplot as plt
 from scipy.spatial.distance import euclidean
 
 sys.path.append('/Users/kenzatazi/Documents/CDT/Code')
-from load import beas_sutlej_gauges, era5, data_dir
 
 
-## Load data
+# Load data
 all_station_dict = pd.read_csv(
     data_dir + 'bs_gauges/gauge_info.csv', index_col='station').T
 sta_list = list(all_station_dict)
-minyear=1980
-maxyear=2010
+minyear = 1980
+maxyear = 2010
 
 df_list = []
 for station in sta_list:
-    station_ds = beas_sutlej_gauges.gauge_download(station, minyear=minyear, maxyear=maxyear)
+    station_ds = beas_sutlej_gauges.gauge_download(
+        station, minyear=minyear, maxyear=maxyear)
     df_list.append(station_ds.to_dataframe().dropna().reset_index())
     sta_df = pd.concat(df_list)
 
 
-## Find times with the most stations
+# Find times with the most stations
 counts = sta_df.groupby('time').count()
 counts.reset_index(inplace=True)
 
@@ -34,11 +35,11 @@ plt.xlim()
 '''
 
 # On inspection the period between 2000 and 2005 contains
-# the largest number of active stations 
-cv_range_df = sta_df[(sta_df['time']>2000) & (sta_df['time']<2005)]
+# the largest number of active stations
+cv_range_df = sta_df[(sta_df['time'] > 2000) & (sta_df['time'] < 2005)]
 
 
-## Apply k-means to coordinates
+# Apply k-means to coordinates
 
 # Group by elevation to get one entry per location
 cv_range_df1 = cv_range_df.groupby('z').mean()
@@ -60,14 +61,14 @@ print('Cluster: ', unique)
 print('Counts per cluster: ', counts)
 
 
-## Keep stations closest to cluster centers
+# Keep stations closest to cluster centers
 
 closest_pt_idx = []
 
 # Loop over all clusters
 for iclust in range(kmeans.n_clusters):
     # get all points assigned to each cluster:
-    cluster_pts = cv_range_df1[cv_range_df1['fold']== iclust]
+    cluster_pts = cv_range_df1[cv_range_df1['fold'] == iclust]
     # get all indices of points assigned to this cluster:
     cluster_pts_indices = np.where(cluster_pts['fold'] == iclust)[0]
 
@@ -93,7 +94,7 @@ plt.legend(fontsize=8)
 plt.savefig('Experiment3_CV.png', dpi=300)
 '''
 
-## Save coordinates for each CV fold
+# Save coordinates for each CV fold
 
 # Convert to 3D array and save as .npy
 cv_arr = np.array(closest_pt_idx)
