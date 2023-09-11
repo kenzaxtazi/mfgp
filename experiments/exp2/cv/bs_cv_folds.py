@@ -2,24 +2,52 @@ import sys  # noqa
 sys.path.append('/Users/kenzatazi/Documents/CDT/Code')  # noqa
 
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import euclidean
 
 # custom modules
-from load import value
+from load import beas_sutlej_gauges, data_dir
 
 
 # Load data
-gauge_df = value.all_gauge_data(2000, 2005, monthly=True)
-cv_range_df = gauge_df.groupby('station_id').mean()
-data = cv_range_df[['longitude', 'latitude']].values
+all_station_dict = pd.read_csv(
+    data_dir + 'bs_gauges/gauge_info.csv', index_col='station').T
+sta_list = list(all_station_dict)
 
-# K-means
-kmeans = KMeans(n_clusters=5).fit(data)
+df_list = []
+minyear = '1980'
+maxyear = '2009-12-31'
+
+for station in sta_list:
+    station_ds = beas_sutlej_gauges.gauge_download(
+        station, minyear=minyear, maxyear=maxyear)
+    df_list.append(station_ds.to_dataframe().dropna().reset_index())
+    sta_df = pd.concat(df_list)
+
+# Identify time period with most data
+counts = sta_df.groupby('time').count()
+counts.reset_index(inplace=True)
+
+'''
+plt.figure(figsize=(20, 5))
+plt.scatter(counts['time'], counts['lat'])
+plt.ylabel('Number of active stations')
+plt.xlabel('Year')
+plt.savefig('stations_count_vs_time.pdf', bbox_inches='tight', dpi=300)
+'''
+# visually we identify 2000-2005 as a period with approximately the most data
+gauge_df = sta_df[(sta_df['time'] > 2000) & (sta_df['time'] < 2005)]
+
+# Apply K-means clustering
+cv_range_df1 = gauge_df.groupby('z').mean()
+kmeans = KMeans(n_clusters=5, random_state=101).fit(
+    cv_range_df1.values[:, 2:4])
 unique, counts = np.unique(kmeans.labels_, return_counts=True)
 #print(unique, counts)
 # print(kmeans.cluster_centers_)
-cv_range_df['fold'] = kmeans.labels_
+cv_range_df1['fold'] = kmeans.labels_
 
 # Plot initial groups
 """
@@ -35,7 +63,7 @@ plt.scatter(kmeans.cluster_centers_[:, 0],
 closest_pt_idx = []
 for iclust in range(kmeans.n_clusters):
     # get all points assigned to each cluster:
-    cluster_pts = cv_range_df[cv_range_df['fold'] == iclust]
+    cluster_pts = cv_range_df1[cv_range_df1['fold'] == iclust]
     # get all indices of points assigned to this cluster:
     cluster_pts_indices = np.where(cluster_pts['fold'] == iclust)[0]
 
@@ -49,8 +77,8 @@ for iclust in range(kmeans.n_clusters):
 '''
 cv_arr = np.array(closest_pt_idx)
 print(cv_arr.shape)
-np.save('exp1_cv_locs_test.npy', cv_arr)
+np.save('exp2_cv_locs_test.npy', cv_arr)
 
 centers_arr = np.array(kmeans.clusters_centers_)
-np.save('exp1_cv_cluster_centers.npy', cv_arr)
+np.save('exp2_cv_cluster_centers.npy', cv_arr)
 '''

@@ -41,4 +41,4 @@ plt.scatter(recov_cluster_centres[:, 0], recov_cluster_centres[:, 1],
             c='k', marker='*', label='cluster centres')
 
 plt.legend(fontsize=8)
-plt.savefig('exp1_cv_with_inset.pdf', bbox_inches='tight', dpi=300)
+plt.savefig('exp1_cv_with_inset_test.pdf', bbox_inches='tight', dpi=300)
