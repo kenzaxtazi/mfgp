@@ -136,7 +136,7 @@ def bs_gauge_stats_all(minyear: str, maxyear: str) -> tuple:
         aphro_ds = aphrodite.collect_APHRO(location, minyear, maxyear)
         cru_ds = cru.collect_CRU(location, minyear, maxyear)
         era5_ds = era5.collect_ERA5(location, minyear, maxyear)
-        gpm_ds = gpm.collect_GPM(location,  minyear, maxyear)
+        gpm_ds = gpm.collect_GPM(location, minyear, maxyear)
         wrf_ds = beas_sutlej_wrf.collect_BC_WRF(location, minyear, maxyear)
 
         timeseries = [era5_ds, gpm_ds, aphro_ds, cru_ds, wrf_ds]
