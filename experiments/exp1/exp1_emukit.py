@@ -55,7 +55,7 @@ gauge_df = value.all_gauge_data(minyear, maxyear, monthly=True)
 station_names = gauge_df.drop_duplicates('name')['name']
 
 # Get CV scheme
-cv_locs = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp1/cv/exp1_cv_locs.npy')
+cv_locs = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/exp1/cv/exp1_cv_locs.npy')
 cv_locs = cv_locs.reshape(-1, 2)
 
 station_list = []
@@ -271,5 +271,5 @@ print('5th RMSE = ', np.mean(RMSE_p5_low), '±', np.std(RMSE_p5_low))
 print('95th RMSE = ', np.mean(RMSE_p95_low), '±', np.std(RMSE_p95_low))
 print('MSLL= ', np.mean(MSLL_low), '±', np.std(MSLL_low))
 
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp1/exp1_ypred_lf_r2_2000-2005.npy', r2_low_list)
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp1/exp1_ypred_hf_r2_2000-2005.npy', r2_high_list)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp1/exp1_ypred_lf_r2_2000-2005.npy', r2_low_list)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp1/exp1_ypred_hf_r2_2000-2005.npy', r2_high_list)

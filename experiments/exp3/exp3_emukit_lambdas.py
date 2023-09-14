@@ -79,4 +79,4 @@ for year in range(1980, 2010):
     lambdas.append(lf_lambda)
 
 pd.to_csv(
-    '/data/hpcdata/users/kenzi22/mfdgp/experiments/exp3/lambdas_1980_2010', lambdas)
+    '/data/hpcdata/users/kenzi22/mfgp/experiments/exp3/lambdas_1980_2010', lambdas)

@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 from load import beas_sutlej_gauges, era5
 import sys
 sys.path.append('/data/hpcdata/users/kenzi22/')
-sys.path.append('/data/hpcdata/users/kenzi22/mfdgp/')
+sys.path.append('/data/hpcdata/users/kenzi22/mfgp/')
 
 
 if __name__ in "__main__":

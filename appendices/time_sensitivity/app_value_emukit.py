@@ -42,7 +42,7 @@ gauge_df = value.all_gauge_data(minyear, maxyear, monthly=True)
 station_names = gauge_df.drop_duplicates('name')['name']
 
 # Get CV scheme
-cv_locs = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp1/cv/exp1_cv_locs.npy')
+cv_locs = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/exp1/cv/exp1_cv_locs.npy')
 cv_locs = cv_locs.reshape(-1, 2)
 
 station_list = []
@@ -139,13 +139,13 @@ np.save('data/lf_lambda_1980-2010.npy', lf_lambdas)
 '''
 
 ### Load data
-cv_x_train_hf = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/app_c/data/cv_x_train_hf_value_1980-2010.npy', allow_pickle=True)
-cv_y_train_hf = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/app_c/data/cv_y_train_hf_value_1980-2010.npy', allow_pickle=True)
-cv_x_train_lf = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/app_c/data/cv_x_train_lf_value_1980-2010.npy', allow_pickle=True)
-cv_y_train_lf = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/app_c/data/cv_y_train_lf_value_1980-2010.npy', allow_pickle=True)
-cv_x_val = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/app_c/data/cv_x_val_value_1980-2010.npy', allow_pickle=True)
-cv_y_val = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/app_c/data/cv_y_val_value_1980-2010.npy', allow_pickle=True)
-lf_lambdas = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/app_c/data/lf_lambda_1980-2010.npy', allow_pickle=True)
+cv_x_train_hf = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/app_c/data/cv_x_train_hf_value_1980-2010.npy', allow_pickle=True)
+cv_y_train_hf = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/app_c/data/cv_y_train_hf_value_1980-2010.npy', allow_pickle=True)
+cv_x_train_lf = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/app_c/data/cv_x_train_lf_value_1980-2010.npy', allow_pickle=True)
+cv_y_train_lf = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/app_c/data/cv_y_train_lf_value_1980-2010.npy', allow_pickle=True)
+cv_x_val = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/app_c/data/cv_x_val_value_1980-2010.npy', allow_pickle=True)
+cv_y_val = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/app_c/data/cv_y_val_value_1980-2010.npy', allow_pickle=True)
+lf_lambdas = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/app_c/data/lf_lambda_1980-2010.npy', allow_pickle=True)
 
 
 

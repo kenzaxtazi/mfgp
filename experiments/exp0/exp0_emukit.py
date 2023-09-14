@@ -37,7 +37,7 @@ gauge_df = value.all_gauge_data(minyear, maxyear, monthly=True)
 station_names = gauge_df.drop_duplicates('name')['name']
 
 # Get CV scheme
-cv_locs = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp1/cv/exp1_cv_locs.npy')
+cv_locs = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/exp1/cv/exp1_cv_locs.npy')
 cv_locs = cv_locs.reshape(-1, 2)
 
 station_list = []
@@ -122,16 +122,16 @@ for i in range(len(cv_train_list)):
     cv_y_val.append(y_val)
     lf_lambdas.append(lf_lambda)
 
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/cv_x_train_hf_value_2000-2005.npy', cv_x_train_hf)
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/cv_y_train_hf_value_2000-2005.npy', cv_y_train_hf)
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/cv_x_train_lf_value_2000-2005.npy', cv_x_train_lf)
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/cv_y_train_lf_value_2000-2005.npy', cv_y_train_lf)
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/cv_y_val_value_2000-2005.npy', cv_y_val)
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/cv_x_val_value_2000-2005.npy', cv_x_val)
-np.save('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/lf_lambda_2000-2005.npy', lf_lambdas)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp0/data/cv_x_train_hf_value_2000-2005.npy', cv_x_train_hf)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp0/data/cv_y_train_hf_value_2000-2005.npy', cv_y_train_hf)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp0/data/cv_x_train_lf_value_2000-2005.npy', cv_x_train_lf)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp0/data/cv_y_train_lf_value_2000-2005.npy', cv_y_train_lf)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp0/data/cv_y_val_value_2000-2005.npy', cv_y_val)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp0/data/cv_x_val_value_2000-2005.npy', cv_x_val)
+np.save('/data/hpcdata/users/kenzi22/mfgp/experiments/exp0/data/lf_lambda_2000-2005.npy', lf_lambdas)
 
 '''
-cv_dir = '/data/hpcdata/users/kenzi22/mfdgp/experiments/exp0/data/'
+cv_dir = '/data/hpcdata/users/kenzi22/mfgp/experiments/exp0/data/'
 
 cv_x_train_hf = np.load(
     cv_dir + 'cv_x_train_hf_value_2000-2005.npy', allow_pickle=True)

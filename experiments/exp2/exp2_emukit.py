@@ -35,7 +35,7 @@ maxyear = 2005
 
 # Load cross-validation scheme
 all_station_dict = pd.read_csv(data_dir + 'bs_gauges/gauge_info.csv', index_col='station')
-cv_locs = np.load('/data/hpcdata/users/kenzi22/mfdgp/experiments/exp2/cv/cv_locs.npy')
+cv_locs = np.load('/data/hpcdata/users/kenzi22/mfgp/experiments/exp2/cv/cv_locs.npy')
 cv_locs = cv_locs.reshape(-1, 2)
 
 station_list = []

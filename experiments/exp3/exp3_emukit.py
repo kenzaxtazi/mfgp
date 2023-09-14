@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import sys
+sys.path.append('/data/hpcdata/users/kenzi22')
+
 from emukit.multi_fidelity.convert_lists_to_array import convert_x_list_to_array, convert_xy_lists_to_arrays
 from emukit.multi_fidelity.models import GPyLinearMultiFidelityModel
 from emukit.model_wrappers.gpy_model_wrappers import GPyMultiOutputWrapper
@@ -22,8 +25,8 @@ from load import beas_sutlej_gauges, era5, data_dir
 
 
 # Load data
-minyear = os.environ["minyear"]
-maxyear = os.environ["maxyear"]
+minyear = str(os.environ["minyear"])
+maxyear = str(os.environ["maxyear"]-1) +'-12-31'
 
 all_station_dict = pd.read_csv(
     data_dir + 'bs_gauges/gauge_info.csv', index_col='station').T
