@@ -16,8 +16,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from load import beas_sutlej_gauges, era5, data_dir
-import sys
-sys.path.append('/data/hpcdata/users/kenzi22')
+
 
 #from utils.metrics import msll
 
@@ -101,9 +100,9 @@ gpy_lin_mf_model.mixed_noise.Gaussian_noise.fix(0)
 gpy_lin_mf_model.mixed_noise.Gaussian_noise_1.fix(0)
 gpy_lin_mf_model.unconstrain()
 gpy_lin_mf_model.multifidelity.Mat52_1.lengthscale[[1]].set_prior(
-    GPy.priors.Gaussian(0.6, 0.5))  # constrain_bounded(0.5,1)
+    GPy.priors.Gaussian(1.12, 0.56))  # constrain_bounded(0.5,1)
 gpy_lin_mf_model.multifidelity.Mat52_1.lengthscale[[2]].set_prior(
-    GPy.priors.Gaussian(0.6, 0.5))  # constrain_bounded(0.5,1)
+    GPy.priors.Gaussian(0.53, 0.27))  # constrain_bounded(0.5,1)
 lin_mf_model = GPyMultiOutputWrapper(
     gpy_lin_mf_model, 2, n_optimization_restarts=5)
 lin_mf_model.optimize()
