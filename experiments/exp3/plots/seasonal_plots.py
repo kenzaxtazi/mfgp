@@ -1,6 +1,6 @@
 import os
 import sys  # noqa
-sys.path.append('/Users/kenzatazi/Documents/CDT/Code')  # noqa
+sys.path.append('/data/hpcdata/users/kenzi22')  # noqa
 
 import scipy as sp
 import numpy as np
@@ -12,17 +12,19 @@ import cartopy.crs as ccrs
 import matplotlib.cm as cm
 import cartopy.feature as cf
 import matplotlib.pyplot as plt
+plt.rcParams.update({'font.size': 22})
 
 from PIL import ImageColor
 from generativepy.color import Color
 from matplotlib.colors import rgb2hex
 from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
+from load import era5, data_dir, location_sel
 
 
 def load_results(dataframe=False) -> xr.Dataset:
 
-    filepath = '/Users/kenzatazi/Documents/CDT/Code/mfdgp/experiments/exp3/outputs/preds_latlonpriors_mat52'
+    filepath = 'experiments/exp3/outputs_2000_2010'
     file_list = os.listdir(filepath)
 
     x_plt_df = pd.DataFrame()
@@ -32,7 +34,7 @@ def load_results(dataframe=False) -> xr.Dataset:
                               [i]).drop(columns=['Unnamed: 0'])
         # Combine into dataframe
         hf_lambda = np.load(
-            '/Users/kenzatazi/Documents/CDT/Code/mfdgp/experiments/exp3/outputs/lambdas.npy')[i]
+            'experiments/exp3/plots/lambdas.npy')[i]
         df_temp['y_pred'] = sp.special.inv_boxcox(
             df_temp['pred0'].values, hf_lambda)
         df_temp['95th'] = sp.special.inv_boxcox(
@@ -56,7 +58,7 @@ def load_results(dataframe=False) -> xr.Dataset:
         return ds
 
 
-def seasonal_means(da: xr.DataArray) -> xr.Dataset:
+def seasonal_means(da: xr.DataArray, var: str) -> xr.Dataset:
 
     ds_annual_avg = da.mean(dim='time')
 
@@ -65,14 +67,14 @@ def seasonal_means(da: xr.DataArray) -> xr.Dataset:
     ds_aug = da[7::12]
     ds_sep = da[8::12]
     ds_monsoon = xr.merge([ds_jun, ds_jul, ds_aug, ds_sep])
-    ds_monsoon_avg = ds_monsoon.y_pred.mean(dim='time')
+    ds_monsoon_avg = ds_monsoon[var].mean(dim='time')
 
     ds_dec = da[11::12]
     ds_jan = da[0::12]
     ds_feb = da[1::12]
     ds_mar = da[2::12]
     ds_west = xr.merge([ds_dec, ds_jan, ds_feb, ds_mar])
-    ds_west_avg = ds_west.y_pred.mean(dim='time')
+    ds_west_avg = ds_west[var].mean(dim='time')
 
     ds_avg = xr.concat([ds_annual_avg, ds_monsoon_avg, ds_west_avg],
                        pd.Index(["Annual", "Monsoon (JJAS)", "Winter (DJFM)"], name='t'))
@@ -80,10 +82,10 @@ def seasonal_means(da: xr.DataArray) -> xr.Dataset:
     return ds_avg
 
 
-def plot_mean_posterior(da: xr.DataArray, title: str) -> None:
+def plot_mean_posterior() -> xr.Dataset:
     """ Plot mean posterior figure """
     ds = load_results()
-    ds_avg_ypred = seasonal_means(ds.y_pred)
+    ds_avg_ypred = seasonal_means(ds.y_pred, 'y_pred')
 
     # Plot
     g = ds_avg_ypred.plot(
@@ -95,14 +97,13 @@ def plot_mean_posterior(da: xr.DataArray, title: str) -> None:
         subplot_kws={"projection": ccrs.PlateCarree()})
 
     '''
-    g.axs.flat[0].set_title("Annual", fontsize=22)
-    g.axs.flat[1].set_title("Monsoon (JJAS)", fontsize=22)
-    g.axs.flat[2].set_title("Winter (DJFM)", fontsize=22)
+    g.axes.flat[0].set_title("Annual", fontsize=22)
+    g.axes.flat[1].set_title("Monsoon (JJAS)", fontsize=22)
+    g.axes.flat[2].set_title("Winter (DJFM)", fontsize=22)
     '''
-
-    g.axs.flat[0].set_title(" ")
-    g.axs.flat[1].set_title(" ")
-    g.axs.flat[2].set_title(" ")
+    g.axes.flat[0].set_title(" ")
+    g.axes.flat[1].set_title(" ")
+    g.axes.flat[2].set_title(" ")
 
     for ax in g.axes.flat:
         ax.coastlines()
@@ -116,15 +117,17 @@ def plot_mean_posterior(da: xr.DataArray, title: str) -> None:
         if isinstance(artist, plt.Line2D):
             artist.set_antialiased(False)
 
-    plt.savefig('plots/seasonal_2000-2010_test.png',
+    plt.savefig('experiments/exp3/plots/seasonal_2000-2010_test.png',
                 dpi=600, bbox_inches="tight")
+    
+    return ds_avg_ypred
 
 
-def confidence_interval() -> None:
+def plot_confidence_interval() -> xr.Dataset:
     """ Plot confidence interval figure """
 
     ds = load_results()
-    ds_avg_CI = seasonal_means(ds.CI)
+    ds_avg_CI = seasonal_means(ds.CI, 'CI')
 
     g = ds_avg_CI.plot(
         x="lon",
@@ -135,9 +138,9 @@ def confidence_interval() -> None:
         size=5, aspect=2.1,
         subplot_kws={"projection": ccrs.PlateCarree()})
 
-    g.axs.flat[0].set_title(" ")
-    g.axs.flat[1].set_title(" ")
-    g.axs.flat[2].set_title(" ")
+    g.axes.flat[0].set_title(" ")
+    g.axes.flat[1].set_title(" ")
+    g.axes.flat[2].set_title(" ")
 
     for ax in g.axes.flat:
         gl = ax.gridlines(draw_labels=True)
@@ -153,25 +156,27 @@ def confidence_interval() -> None:
         if isinstance(artist, plt.Line2D):
             artist.set_edgecolor('none')
 
-    plt.savefig('plots/seasonal_CI_2000-2010.png',
+    plt.savefig('experiments/exp3/plots/seasonal_CI_2000-2010_test.png',
                 dpi=600, bbox_inches="tight")
+    return ds_avg_CI
 
-
-def bivariate_chloropleth_plot() -> None:
+def plot_bivariate_chloropleth(ds_avg_ypred: xr.Dataset, ds_avg_CI: xr.Dataset) -> None:
     """ Plot bivariate chloropleth plot """
 
     # Load data
-    df = load_results(dataframe=True)
-    values = df['y_pred'].values/df['y_pred'].max()*100
-    ci = df['CI'].values/df['CI'].max()*100
+    df_pred = ds_avg_ypred.to_dataframe().reset_index().dropna()
+    df_ci = ds_avg_CI.to_dataframe().reset_index().dropna()
+    values = df_pred['y_pred'].values/df_pred['y_pred'].max()*100
+    ci = df_ci['CI'].values/df_ci['CI'].values.max()*100
 
     # Percentile bounds defining upper boundaries of color classes
     percentile_bounds = [25, 50, 75, 100]
+    colorlist = bivariate_chloropleth_colorlist(percentile_bounds)
 
     # plot map based on bivariate choropleth
-    df['color_bivariate'] = [get_bivariate_choropleth_color(
+    df_pred['color_bivariate'] = [get_bivariate_choropleth_color(
         p1, p2, percentile_bounds) for p1, p2 in zip(values, ci)]
-    da3 = df.set_index(['t', 'lon', 'lat']).to_xarray()
+    da3 = df_pred.set_index(['t', 'lon', 'lat']).to_xarray()
 
     g = da3.color_bivariate.plot(x='lon', y='lat', col='t', colors=colorlist, add_colorbar=False, levels=np.arange(1, 17),
                                  size=5, aspect=1.7, subplot_kws={"projection": ccrs.PlateCarree()})
@@ -181,11 +186,10 @@ def bivariate_chloropleth_plot() -> None:
         gl.top_labels = False
         gl.right_labels = False
         ax.set_extent([75, 83.5, 29, 34])
-        ax.set_xlabel("Longitude")
 
-    g.axs.flat[0].set_title(" ")
-    g.axs.flat[1].set_title(" ")
-    g.axs.flat[2].set_title(" ")
+    g.axes.flat[0].set_title(" ")
+    g.axes.flat[1].set_title(" ")
+    g.axes.flat[2].set_title(" ")
 
     # now create inset legend
     ax = ax.inset_axes([1.1, 0.3, 0.5, 0.5])
@@ -196,7 +200,7 @@ def bivariate_chloropleth_plot() -> None:
     for i, percentile_bound_p1 in enumerate(percentile_bounds):
         for j, percentile_bound_p2 in enumerate(percentile_bounds):
             percentileboxes = [Rectangle((i, j), 1, 1)]
-            colorlist = bivariate_chloropleth_colorlist(percentile_bounds)
+          
             pc = PatchCollection(
                 percentileboxes, facecolor=colorlist[count], alpha=0.85)
             count += 1
@@ -214,7 +218,7 @@ def bivariate_chloropleth_plot() -> None:
                       yticks, fontsize=12)
     _ = ax.set_ylabel('Uncertainty', fontsize=22)
 
-    plt.savefig('plots/seasonal_bivariate.png', dpi=600, bbox_inches="tight")
+    plt.savefig('experiments/exp3/plots/seasonal_bivariate_2000_2010_test.png', dpi=600, bbox_inches="tight")
 
 
 def bivariate_chloropleth_colorlist(percentile_bounds) -> list:
@@ -265,3 +269,41 @@ def get_bivariate_choropleth_color(p1, p2, percentile_bounds):
     # else:
     #    color = [0.8,0.8,0.8,1]
     return color
+
+def plot_era5()-> None :
+
+    era5_ds= era5.collect_ERA5('indus', '2000', '2010')
+    mask_filepath = data_dir + 'Masks/Beas_Sutlej_mask.nc'
+    era5_interp_ds = location_sel.apply_mask(era5_ds, mask_filepath)
+
+    ds_avg = seasonal_means(era5_interp_ds.tp, 'tp')
+
+    # Plot map
+    g = ds_avg.plot(
+        x="lon",
+        y="lat",
+        col="t",
+        cbar_kwargs={"label": "ERA5 precipitation [mm/day]", "pad": 0.03},
+        size=5, aspect=2.1,
+        subplot_kws={"projection": ccrs.PlateCarree()})
+
+    g.axes.flat[0].set_title("Annual", fontsize=22)
+    g.axes.flat[1].set_title("Monsoon (JJAS)", fontsize=22)
+    g.axes.flat[2].set_title("Winter (DJFM)", fontsize=22)
+
+    for ax in g.axes.flat:
+        ax.coastlines()
+        gl = ax.gridlines(draw_labels=True)
+        gl.top_labels = False
+        gl.right_labels = False
+        ax.set_extent([75, 83.5, 29, 34])
+
+    plt.savefig('experiments/exp3/plots/era5_seasonal_2000-2010_test.png', dpi=600, bbox_inches="tight")
+
+
+if __name__ in '__main__':
+    # plot_era5()
+    ds_avg_ypred = plot_mean_posterior()
+    ds_avg_CI = plot_confidence_interval()
+    plot_bivariate_chloropleth(ds_avg_ypred, ds_avg_CI)
+

@@ -1,25 +1,17 @@
 import os
-import sys  # noqa
-sys.path.append('/Users/kenzatazi/Documents/CDT/Code')  # noqa
-
-import xarray as xr
-import matplotlib.pyplot as plt
-import GPy
-import pandas as pd
-import pickle
 import numpy as np
-import cartopy.crs as ccrs
-import matplotlib.cm as cm
-import cartopy.feature as cf
-import matplotlib.pyplot as plt
 import scipy as sp
+import xarray as xr
+import pandas as pd
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 
 from load import aphrodite, data_dir
 
 # MFGP output
 
 # Load results
-filepath = '/Users/kenzatazi/Documents/CDT/Code/mfdgp/experiments/exp3/outputs/preds_latlonpriors_mat52'
+filepath = 'experiments/exp3/outputs_2000_2010'
 file_list = os.listdir(filepath)
 
 x_plt_df = pd.DataFrame()
@@ -28,8 +20,7 @@ for i in range(10):
     df_temp = pd.read_csv(filepath + '/' + sorted(file_list)
                           [i]).drop(columns=['Unnamed: 0'])
     # Combine into dataframe
-    hf_lambda = np.load(
-        '/Users/kenzatazi/Documents/CDT/Code/mfdgp/experiments/exp3/outputs/lambdas.npy')[i]
+    hf_lambda = np.load('experiments/exp3/plots/lambdas.npy')[i]
     df_temp['y_pred'] = sp.special.inv_boxcox(
         df_temp['pred0'].values, hf_lambda)
     df_temp['95th'] = sp.special.inv_boxcox(
@@ -48,14 +39,14 @@ df = x_plt_df.reset_index()
 df = df.set_index(['time', 'lon', 'lat'])
 ds = df.to_xarray()
 
-print(ds.y_pred.std())
-print(ds.y_pred.mean())
+print('MFGP mean = ',  np.nanmean(ds.y_pred.values))
+print('MFGP std dev = ', np.nanstd(ds.y_pred.values))
 
 
 # APHRODITE
 
 # Load data
-aphro_ds = aphrodite.collect_APHRO('indus', 2000, 2010)
+aphro_ds = aphrodite.collect_APHRO('indus', '2000', '2009-12-31')
 
 mask_filepath = data_dir + 'Masks/Beas_Sutlej_highres_mask.nc'
 mask = xr.open_dataset(mask_filepath)
@@ -116,9 +107,9 @@ g = ds_avg.plot(
     size=5, aspect=2.1,
     subplot_kws={"projection": ccrs.PlateCarree()})
 
-g.axs.flat[0].set_title("Annual", fontsize=22)
-g.axs.flat[1].set_title("Monsoon (JJAS)", fontsize=22)
-g.axs.flat[2].set_title("Winter (DJFM)", fontsize=22)
+g.axes.flat[0].set_title("Annual", fontsize=22)
+g.axes.flat[1].set_title("Monsoon (JJAS)", fontsize=22)
+g.axes.flat[2].set_title("Winter (DJFM)", fontsize=22)
 
 for ax in g.axes.flat:
     gl = ax.gridlines(draw_labels=True)
@@ -126,5 +117,5 @@ for ax in g.axes.flat:
     gl.right_labels = False
     ax.set_extent([75, 83.5, 29, 34])
 
-plt.savefig('plots/difference_2000-2010_test.png',
+plt.savefig('experiments/exp3/plots/difference_2000-2010_test.png',
             dpi=600, bbox_inches="tight")
