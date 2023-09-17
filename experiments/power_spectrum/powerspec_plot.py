@@ -1,15 +1,10 @@
 # # Power Spectrum Plots
 
 import os
-import sys  # noqa
-sys.path.append('/Users/kenzatazi/Documents/CDT/Code')  # noqa
-
 import scipy as sp
 import numpy as np
 import pandas as pd
 import xarray as xr
-import cartopy.crs as ccrs
-import cartopy.feature as cf
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 
@@ -42,7 +37,7 @@ g.axes.add_feature(cf.BORDERS)
 
 # MFDGP results
 
-filepath = '~/experiments/power_spectrum/outputs'
+filepath = 'experiments/power_spectrum/outputs'
 file_list = os.listdir(filepath)
 
 x_plt_df = pd.DataFrame()
@@ -51,8 +46,7 @@ for i in range(10):
     df_temp = pd.read_csv(filepath + '/' + sorted(file_list)
                           [i]).drop(columns=['Unnamed: 0'])
     # Combine into dataframe
-    hf_lambda = np.load(
-        '~/experiments/exp3/outputs/lambdas.npy')[i]
+    hf_lambda = np.load('experiments/exp3/plots/lambdas.npy')[i]
     df_temp['y_pred'] = sp.special.inv_boxcox(
         df_temp['pred0'].values, hf_lambda)
     df_temp['95th'] = sp.special.inv_boxcox(
