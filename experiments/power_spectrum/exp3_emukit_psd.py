@@ -130,7 +130,8 @@ hr_data_df['pred_low0'] = y_pred_low0
 hr_data_df['y_var0'] = y_var0
 hr_data_df['y_var_low0'] = y_var_low0
 
-filename = 'preds_' + str(minyear) + '_' + str(maxyear) + '.csv'
+filename = 'experiments/power_spectrum/outputs/preds_' + \
+    minyear + '_' + str(int(minyear)+1) + '.csv'
 hr_data_df.to_csv(filename)
 
 #hr_data_df.plot.scatter(x='lon', y='lat', c='pred0', figsize=(10,5))
