@@ -121,3 +121,25 @@ ax2.add_patch(Rectangle((75.5, 30), 7.5, 3.5,
 # Save and plot figure
 plt.savefig('map_plot.pdf', dpi=300, bbox_inches='tight')
 plt.show()
+
+
+def median_beas_sutlej_elev():
+    """ Returns median elevation of the Beas and Sutlej basins """
+
+    # Topography data
+    top_ds = xr.open_dataset(
+        data_dir + 'Elevation/GMTED2010_15n015_00625deg.nc')
+    top_ds = top_ds.assign_coords(
+        {'nlat': top_ds.latitude, 'nlon': top_ds.longitude})
+
+    # Basin masks
+    mask_filepath = data_dir + 'Masks/Beas_Sutlej_mask.nc'
+    mask = xr.open_dataset(mask_filepath)
+    mask = mask.rename({'latitude': 'nlat', 'longitude': 'nlon'})
+    elv_da = top_ds.elevation.interp_like(mask)
+    mask_da = mask.overlap
+    masked_da = elv_da.where(mask_da > 0, drop=True)
+
+    median_elev = masked_da.median(skipna=True).values
+    print('Median elevation: ', median_elev, 'm')
+    return median_elev
