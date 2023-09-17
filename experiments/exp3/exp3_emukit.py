@@ -25,8 +25,8 @@ from load import beas_sutlej_gauges, era5, data_dir
 
 
 # Load data
-minyear = str(os.environ["minyear"])
-maxyear = str(os.environ["maxyear"]-1) +'-12-31'
+minyear = str(int(os.environ["year"]))
+maxyear = str(int(os.environ["year"])) + '-12-31'
 
 all_station_dict = pd.read_csv(
     data_dir + 'bs_gauges/gauge_info.csv', index_col='station').T
@@ -38,6 +38,8 @@ for station in station_list:
         station, minyear=minyear, maxyear=maxyear)
     hf_train_list.append(station_ds.to_dataframe().dropna().reset_index())
 hf_train_df = pd.concat(hf_train_list)
+hf_train_df['time'] = pd.to_datetime(hf_train_df['time'])
+hf_train_df['time'] = pd.to_numeric(hf_train_df['time'])
 
 # era5.collect_ERA5('indus', minyear=minyear, maxyear=maxyear)
 era5_ds = era5.collect_ERA5('indus', minyear=minyear, maxyear=maxyear)
@@ -48,6 +50,8 @@ lf_df1 = lf_df[lf_df['lat'] <= 33.5]
 lf_df2 = lf_df1[lf_df1['lat'] >= 30.25]
 lf_df3 = lf_df2[lf_df2['lon'] >= 75.75]
 lf_train_df = lf_df3[lf_df3['lon'] <= 82.5]
+lf_train_df['time'] = pd.to_datetime(lf_train_df['time'])
+lf_train_df['time'] = pd.to_numeric(lf_train_df['time'])
 
 # Import GMTED2010 data
 gmted_ds = xr.open_dataset(data_dir + '/Elevation/GMTED2010_data.nc')
@@ -65,6 +69,8 @@ hr_data_ds = msk_hr_data_ds.reindex({'time': times.values}, method='ffill')
 hr_data_df = hr_data_ds.to_dataframe().dropna().reset_index()
 hr_data_df = hr_data_df.rename(columns={'level_0': 'time'})
 hr_data_df = hr_data_df[['time', 'lon', 'lat', 'elevation']]
+hr_data_df['time'] = pd.to_datetime(hr_data_df['time'])
+hr_data_df['time'] = pd.to_numeric(hr_data_df['time'])
 
 # Prepare data
 
@@ -123,7 +129,7 @@ hr_data_df['pred_low0'] = y_pred_low0
 hr_data_df['y_var0'] = y_var0
 hr_data_df['y_var_low0'] = y_var_low0
 
-filename = 'preds_' + str(minyear) + '_' + str(maxyear) + '.csv'
+filename = 'preds_' + minyear + '_' + str(int(minyear)+1) + '.csv'
 hr_data_df.to_csv(filename)
 
 #hr_data_df.plot.scatter(x='lon', y='lat', c='pred0', figsize=(10,5))
