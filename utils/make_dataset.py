@@ -1,15 +1,13 @@
 import pandas as pd
-import scipy as sp
 import numpy as np
 import glob
-import xarray as xr
 
 from scipy import special
 
 
-directory = 'experiments/exp3/outputs_all/*'
+directory = 'experiments/exp3/outputs_all/'
 tr_directory = 'experiments/exp3/tr_outputs_all/'
-paths = glob.glob(directory)
+paths = glob.glob(directory + '*')
 
 # Info for inverse transform
 scaling_df = pd.read_csv('experiments/exp3/lambdas_1980_2013.csv')
@@ -38,12 +36,14 @@ for path in paths:
     p = path.split('/')
     df.to_csv(tr_directory + p[-1])
 
-tr_paths = glob.glob(tr_directory)
+tr_paths = glob.glob(tr_directory + '*')
 tr_df_all = pd.concat(map(pd.read_csv, tr_paths))
 tr_df_all.drop(columns=['Unnamed: 0'], inplace=True)
-tr_df_all.rename(columns={'elevation': 'elev'}, inplace=True)
-tr_df_all['date'] = pd.to_datetime(tr_df_all['time']).astype("datetime64[M]")
-tr_df_all.drop(columns='time', inplace=True)
+tr_df_all.rename(columns={'elevation': 'elev', 'time':'date'}, inplace=True)
+tr_df_all['date'] = pd.to_datetime(tr_df_all['date']).astype("datetime64[M]")
+tr_df_all.sort_values(by='date', inplace=True)
+tr_df_all.reset_index(inplace=True)
+tr_df_all.drop(columns=['index'], inplace=True)
 tr_df_all.to_csv('experiments/exp3/mfgp_predictions_1980_2013.csv')
 
 # to xr.Dataset
