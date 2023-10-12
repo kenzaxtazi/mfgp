@@ -6,6 +6,7 @@ import pandas as pd
 import cartopy.crs as ccrs
 import cartopy.feature as crf
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from cartopy.io import shapereader
 
@@ -13,8 +14,9 @@ from cartopy.io import shapereader
 from load import beas_sutlej_gauges, data_dir
 
 # Load data
-recov_cluster_centres = np.load('exp2_cv_cluster_centers.npy')
-recov_locs = np.load('exp2_cv_locs.npy')
+recov_cluster_centres = np.load(
+    'experiments/exp2/cv/exp2_cv_cluster_centers.npy')
+recov_locs = np.load('experiments/exp2/cv/cv_locs.npy')
 
 all_station_dict = pd.read_csv(
     data_dir + 'bs_gauges/gauge_info.csv', index_col='station').T
@@ -30,7 +32,7 @@ for station in sta_list:
     df_list.append(station_ds.to_dataframe().dropna().reset_index())
     sta_df = pd.concat(df_list)
 
-gauge_df = sta_df[(sta_df['time'] > 2000) & (sta_df['time'] < 2005)]
+gauge_df = sta_df[(sta_df['time'] > '2000') & (sta_df['time'] < '2005')]
 
 
 # Load shapefiles and define projections
@@ -85,11 +87,13 @@ for rec in stlj_shape.records():
 ax.set_xlim([75.7, 79.2])
 ax.set_ylim([30.25, 33.2])
 
+colormap = sns.color_palette("colorblind", len(recov_cluster_centres))
 for i in range(len(recov_cluster_centres)):
     plt.scatter(recov_locs[i, :, 0],
-                recov_locs[i, :, 1], label='fold ' + str(i+1), zorder=9)
-plt.scatter(gauge_df['lon'], gauge_df['lat'], edgecolor='k', alpha=0.1,
-            zorder=8, label='other stations')
+                recov_locs[i, :, 1], label='fold ' + str(i+1), color=colormap[i], zorder=9)
+
+plt.scatter(gauge_df['lon'], gauge_df['lat'], edgecolor='k',
+            zorder=8, label='other stations', alpha=0.1)
 plt.scatter(recov_cluster_centres[:, 0], recov_cluster_centres[:, 1],
             c='k', marker='*', label='cluster centres', zorder=10)
 
@@ -99,4 +103,4 @@ plt.yticks([30.5, 31.0, 31.5, 32.0, 32.5, 33.0], [
            '30.5°N', '31°N', '31.5°N', '32°N', '32.5°N', '33°N'])
 
 plt.legend(fontsize=8)
-plt.savefig('exp2_cv_with_inset_test.pdf', bbox_inches='tight', dpi=300)
+plt.savefig('exp2_cv_with_inset_colorblind.pdf', bbox_inches='tight', dpi=300)

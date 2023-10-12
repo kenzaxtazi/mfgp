@@ -1,3 +1,9 @@
+from load import era5, data_dir, location_sel
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Rectangle
+from matplotlib.colors import rgb2hex
+from generativepy.color import Color
+from PIL import ImageColor
 import os
 import sys  # noqa
 sys.path.append('/data/hpcdata/users/kenzi22')  # noqa
@@ -13,13 +19,6 @@ import matplotlib.cm as cm
 import cartopy.feature as cf
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 22})
-
-from PIL import ImageColor
-from generativepy.color import Color
-from matplotlib.colors import rgb2hex
-from matplotlib.patches import Rectangle
-from matplotlib.collections import PatchCollection
-from load import era5, data_dir, location_sel
 
 
 def load_results(dataframe=False) -> xr.Dataset:
@@ -119,7 +118,7 @@ def plot_mean_posterior() -> xr.Dataset:
 
     plt.savefig('experiments/exp3/plots/seasonal_2000-2010_test.png',
                 dpi=600, bbox_inches="tight")
-    
+
     return ds_avg_ypred
 
 
@@ -159,6 +158,7 @@ def plot_confidence_interval() -> xr.Dataset:
     plt.savefig('experiments/exp3/plots/seasonal_CI_2000-2010_test.png',
                 dpi=600, bbox_inches="tight")
     return ds_avg_CI
+
 
 def plot_bivariate_chloropleth(ds_avg_ypred: xr.Dataset, ds_avg_CI: xr.Dataset) -> None:
     """ Plot bivariate chloropleth plot """
@@ -200,7 +200,7 @@ def plot_bivariate_chloropleth(ds_avg_ypred: xr.Dataset, ds_avg_CI: xr.Dataset) 
     for i, percentile_bound_p1 in enumerate(percentile_bounds):
         for j, percentile_bound_p2 in enumerate(percentile_bounds):
             percentileboxes = [Rectangle((i, j), 1, 1)]
-          
+
             pc = PatchCollection(
                 percentileboxes, facecolor=colorlist[count], alpha=0.85)
             count += 1
@@ -218,7 +218,8 @@ def plot_bivariate_chloropleth(ds_avg_ypred: xr.Dataset, ds_avg_CI: xr.Dataset) 
                       yticks, fontsize=12)
     _ = ax.set_ylabel('Uncertainty', fontsize=22)
 
-    plt.savefig('experiments/exp3/plots/seasonal_bivariate_2000_2010_test.png', dpi=600, bbox_inches="tight")
+    plt.savefig('experiments/exp3/plots/seasonal_bivariate_2000_2010_colorblind.png',
+                dpi=600, bbox_inches="tight")
 
 
 def bivariate_chloropleth_colorlist(percentile_bounds) -> list:
@@ -233,9 +234,9 @@ def bivariate_chloropleth_colorlist(percentile_bounds) -> list:
 
     # get corner colors from https://www.joshuastevens.net/cartography/make-a-bivariate-choropleth-map/
     c00 = hex_to_Color('#e8e8e8')
-    c10 = hex_to_Color('#be64ac')
-    c01 = hex_to_Color('#5ac8c8')
-    c11 = hex_to_Color('#3b4994')
+    c10 = hex_to_Color('#64acbe')
+    c01 = hex_to_Color('#c85a5a')
+    c11 = hex_to_Color('#574249')
 
     # now create square grid of colors, using color interpolation from generativepy package
     num_grps = len(percentile_bounds)
@@ -270,9 +271,10 @@ def get_bivariate_choropleth_color(p1, p2, percentile_bounds):
     #    color = [0.8,0.8,0.8,1]
     return color
 
-def plot_era5()-> None :
 
-    era5_ds= era5.collect_ERA5('indus', '2000', '2010')
+def plot_era5() -> None:
+
+    era5_ds = era5.collect_ERA5('indus', '2000', '2010')
     mask_filepath = data_dir + 'Masks/Beas_Sutlej_mask.nc'
     era5_interp_ds = location_sel.apply_mask(era5_ds, mask_filepath)
 
@@ -298,7 +300,8 @@ def plot_era5()-> None :
         gl.right_labels = False
         ax.set_extent([75, 83.5, 29, 34])
 
-    plt.savefig('experiments/exp3/plots/era5_seasonal_2000-2010_test.png', dpi=600, bbox_inches="tight")
+    plt.savefig('experiments/exp3/plots/era5_seasonal_2000-2010_test.png',
+                dpi=600, bbox_inches="tight")
 
 
 if __name__ in '__main__':
@@ -306,4 +309,3 @@ if __name__ in '__main__':
     ds_avg_ypred = plot_mean_posterior()
     ds_avg_CI = plot_confidence_interval()
     plot_bivariate_chloropleth(ds_avg_ypred, ds_avg_CI)
-
