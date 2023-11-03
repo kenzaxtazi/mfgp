@@ -1,4 +1,6 @@
-![icon](figures/mfgp_icon.png)
+<p align="center" width="100%">
+    <img width="25%" src="figures/mfgp_icon.png">
+</p>
 
 # mfgp
 
