@@ -1,4 +1,4 @@
-from load import era5, data_dir, location_sel
+
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 from matplotlib.colors import rgb2hex
@@ -7,6 +7,7 @@ from PIL import ImageColor
 import os
 import sys  # noqa
 sys.path.append('/data/hpcdata/users/kenzi22')  # noqa
+from load import era5, data_dir, location_sel
 
 import scipy as sp
 import numpy as np
@@ -23,7 +24,7 @@ plt.rcParams.update({'font.size': 22})
 
 def load_results(dataframe=False) -> xr.Dataset:
 
-    filepath = 'experiments/exp3/outputs_2000_2010'
+    filepath = 'experiments/exp3/outputs/outputs_2000_2010'
     file_list = os.listdir(filepath)
 
     x_plt_df = pd.DataFrame()
@@ -179,7 +180,7 @@ def plot_bivariate_chloropleth(ds_avg_ypred: xr.Dataset, ds_avg_CI: xr.Dataset) 
     da3 = df_pred.set_index(['t', 'lon', 'lat']).to_xarray()
 
     g = da3.color_bivariate.plot(x='lon', y='lat', col='t', colors=colorlist, add_colorbar=False, levels=np.arange(1, 17),
-                                 size=5, aspect=1.7, subplot_kws={"projection": ccrs.PlateCarree()})
+                                 size=5, aspect=1.715, subplot_kws={"projection": ccrs.PlateCarree()})
 
     for ax in g.axes.flat:
         gl = ax.gridlines(draw_labels=True)
@@ -234,9 +235,9 @@ def bivariate_chloropleth_colorlist(percentile_bounds) -> list:
 
     # get corner colors from https://www.joshuastevens.net/cartography/make-a-bivariate-choropleth-map/
     c00 = hex_to_Color('#e8e8e8')
-    c10 = hex_to_Color('#64acbe')
-    c01 = hex_to_Color('#c85a5a')
-    c11 = hex_to_Color('#574249')
+    c10 = hex_to_Color('#f26b28')
+    c01 = hex_to_Color('#73d0f1')
+    c11 = hex_to_Color('#676869')
 
     # now create square grid of colors, using color interpolation from generativepy package
     num_grps = len(percentile_bounds)
@@ -304,8 +305,8 @@ def plot_era5() -> None:
                 dpi=600, bbox_inches="tight")
 
 
-if __name__ in '__main__':
+# if __name__ in '__main__':
     # plot_era5()
-    ds_avg_ypred = plot_mean_posterior()
-    ds_avg_CI = plot_confidence_interval()
-    plot_bivariate_chloropleth(ds_avg_ypred, ds_avg_CI)
+    # ds_avg_ypred = plot_mean_posterior()
+    # ds_avg_CI = plot_confidence_interval()
+    # plot_bivariate_chloropleth(ds_avg_ypred, ds_avg_CI)
