@@ -348,7 +348,7 @@ def europe_vs_bs_precip_lengthscales(minyear: str, maxyear: str) -> list:
         likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
             noise=torch.ones(len(train_x_value)) * 0.01)
         model = GPRegressionModel(
-            train_x_value, train_y_value, likelihood, custom=False)
+            train_x_value, train_y_value, likelihood, kernel='matern')
 
         # Find optimal model hyperparameters
         model.train()

@@ -19,14 +19,17 @@ from load import beas_sutlej_gauges  # noqa
 class GPRegressionModel(gpytorch.models.ExactGP):
     """ Define GP model """
 
-    def __init__(self, train_x, train_y, likelihood, custom=False):
+    def __init__(self, train_x, train_y, likelihood, kernel):
         super(GPRegressionModel, self).__init__(train_x, train_y, likelihood)
 
         self.mean_module = gpytorch.means.ConstantMean()
-        if custom == False:
+        if kernel == 'rbf':
+            self.covar_module = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.RBFKernel(ard_num_dims=4, active_dims=[0, 1, 2, 3]))
+        if kernel == 'matern':
             self.covar_module = gpytorch.kernels.ScaleKernel(
                 gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=4, active_dims=[0, 1, 2, 3]))
-        if custom == True:
+        if kernel == 'custom':
             self.covar_module = gpytorch.kernels.ScaleKernel(
                 gpytorch.kernels.MaternKernel(
                     nu=2.5, ard_num_dims=3, active_dims=[1, 2, 3])

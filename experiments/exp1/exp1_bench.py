@@ -108,7 +108,7 @@ for j in range(len(cv_train_list)):
     # GP training
     likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(
         noise=torch.ones(len(train_x_hf)) * 0.05)
-    model = GPRegressionModel(train_x_lf, train_y_lf, likelihood, custom=True)
+    model = GPRegressionModel(train_x_lf, train_y_lf, likelihood, kernel = 'custom')
 
     training_iter = 200
     # Find optimal model hyperparameters
