@@ -13,21 +13,19 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 from mfdgp.utils.metrics import mll, r2_low_vs_high
 
-
-# In[6]:
-
-
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
-
-
-# In[5]:
-
 
 import emukit
 from emukit.model_wrappers.gpy_model_wrappers import GPyMultiOutputWrapper
 from emukit.multi_fidelity.models import GPyLinearMultiFidelityModel
 from emukit.multi_fidelity.convert_lists_to_array import convert_x_list_to_array, convert_xy_lists_to_arrays
+
+
+# Set seed
+import random
+random.seed(3)
+
 
 # Date range
 minyear = 2000

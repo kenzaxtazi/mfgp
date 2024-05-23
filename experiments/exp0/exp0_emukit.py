@@ -25,6 +25,9 @@ from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from load import era5, data_dir, value
 
+# Set seed
+import random
+random.seed(3)
 
 # Prepare data
 
