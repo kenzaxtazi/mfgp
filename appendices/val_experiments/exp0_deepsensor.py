@@ -3,26 +3,23 @@ import sys  # noqa
 filepath = '/Users/kenzatazi/Documents/CDT/Code'  # noqa
 sys.path.append(filepath)  # noqa
 
-import neuralprocesses.torch as nps
-import torch
-from mfgp.utils.metrics import mll
-from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error, r2_score
 import scipy as sp
-from tqdm import tqdm
-import pandas as pd
-import matplotlib.pyplot as plt
-from load import era5, data_dir, value
-
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
+from tqdm import tqdm
+from load import era5, data_dir, value
+from sklearn.model_selection import KFold
+from sklearn.metrics import mean_squared_error, r2_score
+
+import deepsensor.torch
 from deepsensor.model import ConvNP
 from deepsensor.train import Trainer
-import deepsensor.torch
 from deepsensor.data import DataProcessor, TaskLoader
 
 
-# Prepare data
+### Prepare data
 
 # Load data
 minyear = '2000'
@@ -106,12 +103,6 @@ for i in range(len(cv_train_list)):
     y_train_hf = hf_train_df[['tp_tr']].values.reshape(-1, 1)
     x_val = val_df[['time', 'lat', 'lon', 'z']].values.reshape(-1, 4)
     y_val = val_df['tp_tr'].values.reshape(-1, 1)
-
-    # Scaling
-    # scaler = StandardScaler().fit(x_train_hf)
-    # x_train_hf1 = scaler.transform(x_train_hf)
-    # x_train_lf1 = scaler.transform(x_train_lf)
-    # x_val1 = scaler.transform(x_val)
     
     cv_train_hf.append(hf_train_df)
     cv_train_lf.append(lf_train_df)
@@ -137,7 +128,6 @@ def compute_val_rmse(model, val_tasks):
         true = data_processor.map_array(task["Y_t"][0], target_var_ID, unnorm=True)
         errors.extend(np.abs(mean - true))
     return np.sqrt(np.mean(np.concatenate(errors) ** 2))
-
 
 dates = pd.date_range(lf_train_df.time.values.min(), lf_train_df.time.values.max(), freq='MS')
 
