@@ -1,6 +1,6 @@
 import matplotlib.lines as mlines
 from matplotlib.patches import Rectangle
-from load import data_dir
+
 from cartopy.io import shapereader
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
@@ -12,7 +12,7 @@ import numpy as np
 
 import sys
 sys.path.append('/Users/kenzatazi/Documents/CDT/Code')  # noqa
-
+from load import data_dir
 
 # Data
 
