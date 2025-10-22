@@ -1,32 +1,32 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import sys
-sys.path.append('/data/hpcdata/users/kenzi22')
+import sys  # noqa
+sys.path.append('/Users/kenzatazi/Documents/CDT/Code')  # noqa
 
-from emukit.multi_fidelity.convert_lists_to_array import convert_x_list_to_array, convert_xy_lists_to_arrays
-from emukit.multi_fidelity.models import GPyLinearMultiFidelityModel
-from emukit.model_wrappers.gpy_model_wrappers import GPyMultiOutputWrapper
-import emukit
-import xarray as xr
-from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error, r2_score
-import scipy as sp
-import os
-import GPy
-import numpy as np
-import pandas as pd
-from matplotlib import pyplot as plt
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from load import beas_sutlej_gauges, era5, data_dir
-
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from matplotlib import pyplot as plt
+import pandas as pd
+import numpy as np
+import GPy
+import os
+import scipy as sp
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import KFold
+import xarray as xr
+import emukit
+from emukit.model_wrappers.gpy_model_wrappers import GPyMultiOutputWrapper
+from emukit.multi_fidelity.models import GPyLinearMultiFidelityModel
+from emukit.multi_fidelity.convert_lists_to_array import convert_x_list_to_array, convert_xy_lists_to_arrays
 
 #from utils.metrics import msll
 
+y = '2013'
 
 # Load data
-minyear = str(int(os.environ["year"]))
-maxyear = str(int(os.environ["year"])) + '-12-31'
+minyear = y
+maxyear = y + '-12-31'
 
 all_station_dict = pd.read_csv(
     data_dir + 'bs_gauges/gauge_info.csv', index_col='station').T
@@ -52,7 +52,7 @@ lf_df3 = lf_df2[lf_df2['lon'] >= 75.75]
 lf_train_df = lf_df3[lf_df3['lon'] <= 82.5]
 lf_train_df['time'] = pd.to_datetime(lf_train_df['time'])
 lf_train_df['time'] = pd.to_numeric(lf_train_df['time'])
-
+'''
 # Import GMTED2010 data
 gmted_ds = xr.open_dataset(data_dir + '/Elevation/GMTED2010_data.nc')
 gmted_ds = gmted_ds.rename({'nlat': 'lat', 'nlon': 'lon'})
@@ -71,12 +71,15 @@ hr_data_df = hr_data_df.rename(columns={'level_0': 'time'})
 hr_data_df = hr_data_df[['time', 'lon', 'lat', 'elevation']]
 hr_data_df['time'] = pd.to_datetime(hr_data_df['time'])
 hr_data_df['time'] = pd.to_numeric(hr_data_df['time'])
-
+'''
 # Prepare data
 
 # Transformations
 lf_train_df['tp_tr'], lf_lambda = sp.stats.boxcox(
     lf_train_df['tp'].values + 0.01)
+
+print(lf_lambda)
+'''
 hf_train_df['tp_tr'] = sp.stats.boxcox(
     hf_train_df['tp'].values + 0.01, lmbda=lf_lambda)
 
@@ -136,3 +139,4 @@ hr_data_df.to_csv(filename)
 # plt.savefig('high_example_no_noise.png')
 #hr_data_df.plot.scatter(x='lon', y='lat', c='pred_low0', figsize=(10,5))
 # plt.savefig('low_example.png')
+'''

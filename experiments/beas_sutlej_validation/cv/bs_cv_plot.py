@@ -61,18 +61,13 @@ stlj_cranfield_crs = ccrs.LambertConformal(
 # Figure
 
 fig = plt.figure(figsize=(6, 5))
-
 ax = plt.axes(projection=ccrs.PlateCarree())
-ax.add_patch(plt.Rectangle((75.7, 30.25), 0.25, 0.25,
-             facecolor='white', edgecolor='black'))
-ax.text(75.77, 30.43, "b", fontsize=14, va='top')
-
 
 for rec in beas_shape.records():
     ax.add_geometries(
         [rec.geometry],
         beas_cranfield_crs,
-        edgecolor="whitesmoke",
+        edgecolor="lightgrey",
         facecolor="white",
     )
 
@@ -80,7 +75,7 @@ for rec in stlj_shape.records():
     ax.add_geometries(
         [rec.geometry],
         stlj_cranfield_crs,
-        edgecolor="whitesmoke",
+        edgecolor="lightgrey",
         facecolor="white",
     )
 
@@ -90,17 +85,22 @@ ax.set_ylim([30.25, 33.2])
 colormap = sns.color_palette("colorblind", len(recov_cluster_centres))
 for i in range(len(recov_cluster_centres)):
     plt.scatter(recov_locs[i, :, 0],
-                recov_locs[i, :, 1], label='fold ' + str(i+1), color=colormap[i], zorder=9)
+                recov_locs[i, :, 1], label='Fold ' + str(i+1), color=colormap[i], zorder=9)
 
-plt.scatter(gauge_df['lon'], gauge_df['lat'], edgecolor='k',
-            zorder=8, label='other stations', alpha=0.1)
+plt.scatter(gauge_df['lon'], gauge_df['lat'], edgecolor=(0,0,0,0.1), facecolor='None', zorder=8, label='Other stations')
 plt.scatter(recov_cluster_centres[:, 0], recov_cluster_centres[:, 1],
-            c='k', marker='*', label='cluster centres', zorder=10)
+            c='k', marker='*', label='Cluster centres', zorder=10)
 
 plt.xticks([76.0, 76.5, 77.0, 77.5, 78.0, 78.5, 79], [
            '76°E', '76.5°E', '77°E', '77.5°E', '78°E', '78.5°E', '79°E'])
 plt.yticks([30.5, 31.0, 31.5, 32.0, 32.5, 33.0], [
            '30.5°N', '31°N', '31.5°N', '32°N', '32.5°N', '33°N'])
+
+ax.add_patch(plt.Rectangle((75.7, 30.25), 0.25, 0.25,
+             facecolor='white', edgecolor='black'))
+ax.annotate('b', xy=(0, 0), xycoords='axes fraction',
+            xytext=(0.8, 0.8), textcoords='offset fontsize',
+            fontsize=14, verticalalignment='center', horizontalalignment='center')
 
 plt.legend(fontsize=8)
 plt.savefig('exp2_cv_with_inset_colorblind.pdf', bbox_inches='tight', dpi=300)
